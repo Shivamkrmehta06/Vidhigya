@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trata_app/app/app_settings.dart';
@@ -8,6 +9,7 @@ import 'package:trata_app/views/home_view.dart';
 import 'package:trata_app/views/login_view.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -30,7 +32,8 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _loadSavedLocale() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final SharedPreferences? prefs = await _loadPrefsSafely();
+    if (prefs == null) return;
     final String? savedLanguageCode = prefs.getString(_localePreferenceKey);
     if (savedLanguageCode == null ||
         savedLanguageCode == _locale.languageCode) {
@@ -47,9 +50,23 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       _locale = Locale(locale.languageCode);
     });
-    SharedPreferences.getInstance().then(
-      (prefs) => prefs.setString(_localePreferenceKey, locale.languageCode),
-    );
+    _persistLocaleSafely(locale.languageCode);
+  }
+
+  Future<SharedPreferences?> _loadPrefsSafely() async {
+    try {
+      return await SharedPreferences.getInstance();
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  Future<void> _persistLocaleSafely(String languageCode) async {
+    final SharedPreferences? prefs = await _loadPrefsSafely();
+    if (prefs == null) return;
+    await prefs.setString(_localePreferenceKey, languageCode);
   }
 
   @override

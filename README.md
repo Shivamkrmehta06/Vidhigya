@@ -1,4 +1,4 @@
-# trata_app
+# Vidhigya
 
 A new Flutter project.
 
