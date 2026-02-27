@@ -15,10 +15,10 @@ For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
 
-// Project TRATA
+// Project Vidhigya
 📌 PROJECT OVERVIEW
-We are building a Flutter mobile application named TRATA – Your City’s Digital Protector.
-This app is a civic issue reporting and women safety platform for India.
+We are building a Flutter mobile application named Vidhigy – Your City’s Digital Protector.
+This app is a civic issue reporting and safety platform for India.
 It includes:
 Civic issue reporting system
 Safety heatmap
@@ -40,11 +40,11 @@ No email/password authentication.
 👤 REGISTRATION FLOW (Multi-step onboarding)
 Step 1: Collect full name
 Step 2: Collect city
-Step 3: Ask if user wants to enable “Nirbhaya Mode”
+Step 3: Ask if user wants to enable “TRATA Mode”
 Step 4: Success screen
-If Nirbhaya Mode is enabled:
+If TRATA Mode is enabled:
 → After onboarding, navigate to Emergency Contact Setup screen.
-🛡 NIRBHAYA MODE (Enhanced Safety Mode)
+🛡 TRATA MODE (Enhanced Safety Mode)
 When enabled:
 Requires minimum 2 emergency contacts
 Enables offline SOS
