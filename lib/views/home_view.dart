@@ -1,4 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:http/http.dart' as http;
+import 'package:xml/xml.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import 'location_map_view.dart';
@@ -26,6 +33,53 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
   late final AnimationController _pulseController;
   late final AnimationController _bgOrbController;
   late final Animation<double> _sosPulse;
+  List<_HomeNewsItem> _localNewsItems = _fallbackLocalNewsItems;
+  bool _isNewsLoading = false;
+
+  static final Uri _newsFeedUri = Uri.parse(
+    'https://news.google.com/rss/search?q=${Uri.encodeQueryComponent('(Bengaluru OR Karnataka) civic issues municipal updates')}&hl=en-IN&gl=IN&ceid=IN:en',
+  );
+
+  static const Map<String, List<String>>
+  _topicImagePools = <String, List<String>>{
+    'road': <String>[
+      'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1520975922284-8b456906c813?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=900&q=80',
+    ],
+    'water': <String>[
+      'https://images.unsplash.com/photo-1521207418485-99c705420785?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=900&q=80',
+    ],
+    'waste': <String>[
+      'https://images.unsplash.com/photo-1515169067868-5387ec356754?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1621451537084-482c73073a0f?auto=format&fit=crop&w=900&q=80',
+    ],
+    'electric': <String>[
+      'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1479973905280-9f9a9a3a1f0a?auto=format&fit=crop&w=900&q=80',
+    ],
+    'traffic': <String>[
+      'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1465447142348-e9952c393450?auto=format&fit=crop&w=900&q=80',
+    ],
+    'weather': <String>[
+      'https://images.unsplash.com/photo-1432836431433-925d3cc0a5cd?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1499346030926-9a72daac6c63?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=900&q=80',
+    ],
+    'general': <String>[
+      'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=900&q=80',
+    ],
+  };
 
   Animation<double> _interval(double start, double end) {
     return CurvedAnimation(
@@ -52,6 +106,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
     _sosPulse = Tween<double>(begin: 1, end: 1.02).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    _loadLocalNewsPreview();
   }
 
   @override
@@ -99,6 +154,468 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
         setState(() => _selectedTab = 0);
       });
     }
+  }
+
+  String _fallbackName() {
+    if (Firebase.apps.isNotEmpty) {
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final String fromEmail = (user.email ?? '').split('@').first;
+        if (fromEmail.isNotEmpty) {
+          return fromEmail;
+        }
+        final String phone = user.phoneNumber ?? '';
+        if (phone.isNotEmpty) {
+          final String digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+          if (digits.length >= 4) {
+            return 'User ${digits.substring(digits.length - 4)}';
+          }
+        }
+      }
+    }
+    return 'Citizen';
+  }
+
+  Future<void> _loadLocalNewsPreview() async {
+    setState(() => _isNewsLoading = true);
+    try {
+      final http.Response response = await http
+          .get(_newsFeedUri)
+          .timeout(const Duration(seconds: 12));
+      if (response.statusCode != 200) {
+        throw Exception('Feed request failed with ${response.statusCode}');
+      }
+      final XmlDocument document = XmlDocument.parse(
+        utf8.decode(response.bodyBytes),
+      );
+      final List<XmlElement> items = document
+          .findAllElements('item')
+          .take(3)
+          .toList();
+      final List<_HomeNewsItem> parsed = <_HomeNewsItem>[];
+      final Set<String> usedFallbackImages = <String>{};
+      for (final XmlElement item in items) {
+        final String rawTitle = _readElement(item, 'title');
+        if (rawTitle.isEmpty) {
+          continue;
+        }
+        final String sourceText = _readElement(item, 'source');
+        final String sourceUrl = _readElementAttribute(item, 'source', 'url');
+        final String description = _readElementHtml(item, 'description');
+        final String? storyLink = _normalizeUrl(_readElement(item, 'link'));
+        final String source = _deriveSource(rawTitle, sourceText);
+        final String? publisherImageUrl = _extractPublisherLogoUrl(
+          sourceUrl: sourceUrl,
+          articleUrl: storyLink,
+          htmlDescription: description,
+        );
+        final String? articleImageUrl = _extractPublisherImage(
+          item,
+          description,
+        );
+        final String? primaryImageUrl = publisherImageUrl ?? articleImageUrl;
+        final String? fallbackImageUrl = publisherImageUrl != null
+            ? articleImageUrl
+            : _pickRelevantFallbackImage(
+                rawTitle,
+                description,
+                usedFallbackImages,
+              );
+        parsed.add(
+          _HomeNewsItem(
+            title: _deriveTitle(rawTitle),
+            source: source,
+            time: _formatRelativeTime(_readElement(item, 'pubDate')),
+            imageUrl: primaryImageUrl,
+            fallbackImageUrl: fallbackImageUrl,
+            summary: _buildPreviewSummary(description),
+            isPublisherImage:
+                publisherImageUrl != null &&
+                primaryImageUrl == publisherImageUrl,
+          ),
+        );
+      }
+      if (!mounted) return;
+      setState(() {
+        _localNewsItems = parsed.isEmpty ? _fallbackLocalNewsItems : parsed;
+        _isNewsLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _localNewsItems = _fallbackLocalNewsItems;
+        _isNewsLoading = false;
+      });
+    }
+  }
+
+  String _readElement(XmlElement parent, String name) {
+    final Iterable<XmlElement> elements = parent.findElements(name);
+    if (elements.isEmpty) {
+      return '';
+    }
+    return elements.first.innerText.trim();
+  }
+
+  String _readElementHtml(XmlElement parent, String name) {
+    final Iterable<XmlElement> elements = parent.findElements(name);
+    if (elements.isEmpty) {
+      return '';
+    }
+    return elements.first.innerXml.trim();
+  }
+
+  String _readElementAttribute(
+    XmlElement parent,
+    String elementName,
+    String attributeName,
+  ) {
+    final Iterable<XmlElement> elements = parent.findElements(elementName);
+    if (elements.isEmpty) {
+      return '';
+    }
+    return (elements.first.getAttribute(attributeName) ?? '').trim();
+  }
+
+  String _deriveTitle(String rawTitle) {
+    final int splitIndex = rawTitle.lastIndexOf(' - ');
+    if (splitIndex <= 0) {
+      return rawTitle.trim();
+    }
+    return rawTitle.substring(0, splitIndex).trim();
+  }
+
+  String _deriveSource(String rawTitle, String sourceFromFeed) {
+    if (sourceFromFeed.isNotEmpty) {
+      return sourceFromFeed;
+    }
+    final int splitIndex = rawTitle.lastIndexOf(' - ');
+    if (splitIndex <= 0 || splitIndex + 3 >= rawTitle.length) {
+      return 'Local News Feed';
+    }
+    return rawTitle.substring(splitIndex + 3).trim();
+  }
+
+  String _sanitizeHtml(String html) {
+    if (html.isEmpty) return '';
+    return html
+        .replaceAll(RegExp(r'<[^>]+>'), ' ')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  String _buildPreviewSummary(String html) {
+    final String cleaned = _sanitizeHtml(html);
+    if (cleaned.isEmpty) return '';
+    if (cleaned.length <= 120) return cleaned;
+    return '${cleaned.substring(0, 117)}...';
+  }
+
+  String _pickRelevantFallbackImage(
+    String title,
+    String description,
+    Set<String> used,
+  ) {
+    final String topic = _deriveTopic('$title $description');
+    final List<String> topicPool = _topicImagePools[topic] ?? const <String>[];
+    final List<String> generalPool =
+        _topicImagePools['general'] ?? const <String>[];
+    final List<String> ordered = <String>[...topicPool, ...generalPool];
+    for (final String candidate in ordered) {
+      if (!used.contains(candidate)) {
+        used.add(candidate);
+        return candidate;
+      }
+    }
+    final int index = used.length % generalPool.length;
+    final String fallback = generalPool[index];
+    used.add(fallback);
+    return fallback;
+  }
+
+  String _deriveTopic(String text) {
+    final String lower = text.toLowerCase();
+    if (lower.contains('pothole') ||
+        lower.contains('road') ||
+        lower.contains('bridge') ||
+        lower.contains('flyover')) {
+      return 'road';
+    }
+    if (lower.contains('water') ||
+        lower.contains('pipeline') ||
+        lower.contains('drain') ||
+        lower.contains('sewage') ||
+        lower.contains('flood')) {
+      return 'water';
+    }
+    if (lower.contains('garbage') ||
+        lower.contains('waste') ||
+        lower.contains('sanitation') ||
+        lower.contains('clean')) {
+      return 'waste';
+    }
+    if (lower.contains('streetlight') ||
+        lower.contains('power') ||
+        lower.contains('electric') ||
+        lower.contains('outage')) {
+      return 'electric';
+    }
+    if (lower.contains('traffic') ||
+        lower.contains('diversion') ||
+        lower.contains('commute') ||
+        lower.contains('vehicle')) {
+      return 'traffic';
+    }
+    if (lower.contains('rain') ||
+        lower.contains('storm') ||
+        lower.contains('weather') ||
+        lower.contains('monsoon')) {
+      return 'weather';
+    }
+    return 'general';
+  }
+
+  String? _extractPublisherImage(XmlElement item, String htmlDescription) {
+    for (final XmlElement element in item.descendants.whereType<XmlElement>()) {
+      final String localName = element.name.local.toLowerCase();
+      final String? url =
+          element.getAttribute('url') ??
+          element.getAttribute('href') ??
+          element.getAttribute('src');
+      final String? normalized = _normalizeUrl(url);
+      if (normalized == null || !_looksLikeImage(normalized)) {
+        continue;
+      }
+      if (localName == 'content' ||
+          localName == 'thumbnail' ||
+          localName == 'enclosure') {
+        return normalized;
+      }
+    }
+    return _extractImageUrl(htmlDescription);
+  }
+
+  String? _extractPublisherLogoUrl({
+    required String sourceUrl,
+    required String? articleUrl,
+    required String htmlDescription,
+  }) {
+    final String? fromSource = _faviconFromUrl(sourceUrl);
+    if (fromSource != null) {
+      return fromSource;
+    }
+    final String? fromDescription = _faviconFromDescriptionLink(
+      htmlDescription,
+    );
+    if (fromDescription != null) {
+      return fromDescription;
+    }
+    return _faviconFromUrl(articleUrl);
+  }
+
+  String? _faviconFromDescriptionLink(String html) {
+    if (html.isEmpty) {
+      return null;
+    }
+    final RegExp hrefPattern = RegExp(
+      r'''href\s*=\s*["']([^"']+)["']''',
+      caseSensitive: false,
+    );
+    for (final RegExpMatch match in hrefPattern.allMatches(html)) {
+      final String? candidate = match.group(1);
+      final String? favicon = _faviconFromUrl(candidate);
+      if (favicon != null) {
+        return favicon;
+      }
+    }
+    return null;
+  }
+
+  String? _faviconFromUrl(String? rawUrl) {
+    final String? normalized = _normalizeUrl(rawUrl);
+    if (normalized == null) {
+      return null;
+    }
+    final Uri? uri = Uri.tryParse(normalized);
+    if (uri == null || uri.host.isEmpty || _looksLikeNewsAggregator(uri.host)) {
+      return null;
+    }
+    return Uri.https('www.google.com', '/s2/favicons', <String, String>{
+      'sz': '256',
+      'domain_url': '${uri.scheme}://${uri.host}',
+    }).toString();
+  }
+
+  bool _looksLikeNewsAggregator(String host) {
+    final String lower = host.toLowerCase();
+    return lower == 'news.google.com' ||
+        lower.endsWith('.news.google.com') ||
+        lower.contains('google.com');
+  }
+
+  String? _extractImageUrl(String html) {
+    final List<RegExp> patterns = <RegExp>[
+      RegExp(r'<img[^>]+src="([^"]+)"', caseSensitive: false),
+      RegExp(r"<img[^>]+src='([^']+)'", caseSensitive: false),
+      RegExp(r'<img[^>]+data-src="([^"]+)"', caseSensitive: false),
+      RegExp(r"<img[^>]+data-src='([^']+)'", caseSensitive: false),
+      RegExp(r'<img[^>]+data-original="([^"]+)"', caseSensitive: false),
+      RegExp(r"<img[^>]+data-original='([^']+)'", caseSensitive: false),
+    ];
+    for (final RegExp pattern in patterns) {
+      final RegExpMatch? match = pattern.firstMatch(html);
+      final String? normalized = _normalizeUrl(match?.group(1));
+      if (normalized != null && _looksLikeImage(normalized)) {
+        return normalized;
+      }
+    }
+    return null;
+  }
+
+  String? _normalizeUrl(String? url) {
+    if (url == null) return null;
+    String normalized = url
+        .replaceAll('&amp;', '&')
+        .replaceAll('&quot;', '"')
+        .trim();
+    if (normalized.startsWith('//')) {
+      normalized = 'https:$normalized';
+    }
+    if (!normalized.startsWith('http://') &&
+        !normalized.startsWith('https://')) {
+      return null;
+    }
+    return normalized;
+  }
+
+  bool _looksLikeImage(String url) {
+    final String lower = url.toLowerCase();
+    if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
+      return false;
+    }
+    if (lower.contains('.svg')) {
+      return false;
+    }
+    if (lower.contains('.jpg') ||
+        lower.contains('.jpeg') ||
+        lower.contains('.png') ||
+        lower.contains('.webp') ||
+        lower.contains('.avif') ||
+        lower.contains('.gif')) {
+      return true;
+    }
+    if (lower.contains('image') ||
+        lower.contains('img') ||
+        lower.contains('photo') ||
+        lower.contains('thumb') ||
+        lower.contains('cdn') ||
+        lower.contains('media')) {
+      return true;
+    }
+    if (lower.contains('/article/') ||
+        lower.contains('/story/') ||
+        lower.contains('/news/')) {
+      return false;
+    }
+    return true;
+  }
+
+  DateTime? _parseRfc822(String value) {
+    final RegExpMatch? match = RegExp(
+      r'^\w{3},\s(\d{1,2})\s(\w{3})\s(\d{4})\s(\d{2}):(\d{2}):(\d{2})\sGMT$',
+    ).firstMatch(value.trim());
+    if (match == null) {
+      return null;
+    }
+    const Map<String, int> months = <String, int>{
+      'Jan': 1,
+      'Feb': 2,
+      'Mar': 3,
+      'Apr': 4,
+      'May': 5,
+      'Jun': 6,
+      'Jul': 7,
+      'Aug': 8,
+      'Sep': 9,
+      'Oct': 10,
+      'Nov': 11,
+      'Dec': 12,
+    };
+    final int? month = months[match.group(2)];
+    if (month == null) {
+      return null;
+    }
+    return DateTime.utc(
+      int.parse(match.group(3)!),
+      month,
+      int.parse(match.group(1)!),
+      int.parse(match.group(4)!),
+      int.parse(match.group(5)!),
+      int.parse(match.group(6)!),
+    );
+  }
+
+  String _formatRelativeTime(String pubDate) {
+    final DateTime? parsed = _parseRfc822(pubDate);
+    if (parsed == null) {
+      return 'Live';
+    }
+    final Duration diff = DateTime.now().difference(parsed.toLocal());
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays == 1) return 'Yesterday';
+    return '${diff.inDays} days ago';
+  }
+
+  Widget _buildGreeting(BuildContext context, Color textPrimary) {
+    if (Firebase.apps.isEmpty) {
+      return Text(
+        'Hello, ${_fallbackName()}',
+        style: TextStyle(
+          fontSize: 28,
+          fontWeight: FontWeight.w700,
+          color: textPrimary,
+        ),
+      );
+    }
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return Text(
+        'Welcome back',
+        style: TextStyle(
+          fontSize: 28,
+          fontWeight: FontWeight.w700,
+          color: textPrimary,
+        ),
+      );
+    }
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final Map<String, dynamic> data =
+            snapshot.data?.data() ?? <String, dynamic>{};
+        final String name = (data['name'] as String?)?.trim().isNotEmpty == true
+            ? (data['name'] as String).trim()
+            : _fallbackName();
+        return Text(
+          'Hello, $name',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w700,
+            color: textPrimary,
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -188,14 +705,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
                   const SizedBox(height: 14),
                   _SectionReveal(
                     animation: _interval(0.12, 0.28),
-                    child: Text(
-                      l10n.t('home.greeting'),
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                        color: textPrimary,
-                      ),
-                    ),
+                    child: _buildGreeting(context, textPrimary),
                   ),
                   const SizedBox(height: 6),
                   _SectionReveal(
@@ -520,31 +1030,35 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
                   _SectionReveal(
                     animation: _interval(0.68, 0.84),
                     child: Column(
-                      children: const [
-                        _NewsCard(
-                          title: 'City announces new pothole response squad',
-                          source: 'Bengaluru Civic Desk',
-                          time: 'Today • 8:40 AM',
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=900&q=80',
-                        ),
-                        SizedBox(height: 10),
-                        _NewsCard(
-                          title:
-                              'Water pipeline repairs planned for Indiranagar',
-                          source: 'City Water Board',
-                          time: 'Today • 7:15 AM',
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=900&q=80',
-                        ),
-                        SizedBox(height: 10),
-                        _NewsCard(
-                          title: 'Streetlight upgrades approved for 12 wards',
-                          source: 'Urban Infra Update',
-                          time: 'Yesterday • 6:05 PM',
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=900&q=80',
-                        ),
+                      children: [
+                        if (_isNewsLoading && _localNewsItems.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                          ),
+                        for (int i = 0; i < _localNewsItems.length; i++) ...[
+                          _NewsCard(
+                            title: _localNewsItems[i].title,
+                            source: _localNewsItems[i].source,
+                            time: _localNewsItems[i].time,
+                            imageUrl: _localNewsItems[i].imageUrl,
+                            fallbackImageUrl:
+                                _localNewsItems[i].fallbackImageUrl,
+                            summary: _localNewsItems[i].summary,
+                            isPublisherImage:
+                                _localNewsItems[i].isPublisherImage,
+                          ),
+                          if (i != _localNewsItems.length - 1)
+                            const SizedBox(height: 10),
+                        ],
                       ],
                     ),
                   ),
@@ -905,17 +1419,79 @@ class _FeatureCard extends StatelessWidget {
   }
 }
 
+const List<_HomeNewsItem> _fallbackLocalNewsItems = <_HomeNewsItem>[
+  _HomeNewsItem(
+    title: 'City announces new pothole response squad',
+    source: 'Bengaluru Civic Desk',
+    time: 'Today • 8:40 AM',
+    imageUrl:
+        'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=900&q=80',
+    fallbackImageUrl:
+        'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=900&q=80',
+    summary:
+        'Rapid pothole response teams have been announced for high-traffic corridors and school zones.',
+  ),
+  _HomeNewsItem(
+    title: 'Water pipeline repairs planned for Indiranagar',
+    source: 'City Water Board',
+    time: 'Today • 7:15 AM',
+    imageUrl:
+        'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=900&q=80',
+    fallbackImageUrl:
+        'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=900&q=80',
+    summary:
+        'Night maintenance near 12th Main may affect pressure in nearby lanes; residents advised to store water.',
+  ),
+  _HomeNewsItem(
+    title: 'Streetlight upgrades approved for 12 wards',
+    source: 'Urban Infra Update',
+    time: 'Yesterday • 6:05 PM',
+    imageUrl:
+        'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=900&q=80',
+    fallbackImageUrl:
+        'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=900&q=80',
+    summary:
+        'Smart LED replacement with remote fault monitoring has been approved for phased rollout.',
+  ),
+];
+
+class _HomeNewsItem {
+  final String title;
+  final String source;
+  final String time;
+  final String? imageUrl;
+  final String? fallbackImageUrl;
+  final String summary;
+  final bool isPublisherImage;
+
+  const _HomeNewsItem({
+    required this.title,
+    required this.source,
+    required this.time,
+    required this.imageUrl,
+    this.fallbackImageUrl,
+    required this.summary,
+    this.isPublisherImage = false,
+  });
+}
+
 class _NewsCard extends StatelessWidget {
   final String title;
   final String source;
   final String time;
-  final String imageUrl;
+  final String? imageUrl;
+  final String? fallbackImageUrl;
+  final String? summary;
+  final bool isPublisherImage;
 
   const _NewsCard({
     required this.title,
     required this.source,
     required this.time,
-    required this.imageUrl,
+    this.imageUrl,
+    this.fallbackImageUrl,
+    this.summary,
+    this.isPublisherImage = false,
   });
 
   @override
@@ -936,7 +1512,55 @@ class _NewsCard extends StatelessWidget {
             child: SizedBox(
               width: 100,
               height: 88,
-              child: Image.network(imageUrl, fit: BoxFit.cover),
+              child: imageUrl == null && fallbackImageUrl == null
+                  ? Container(
+                      color: AppTheme.cloud,
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.newspaper_rounded,
+                        color: textMuted,
+                        size: 22,
+                      ),
+                    )
+                  : Image.network(
+                      imageUrl ?? fallbackImageUrl!,
+                      fit: isPublisherImage ? BoxFit.contain : BoxFit.cover,
+                      alignment: Alignment.center,
+                      headers: const <String, String>{
+                        'User-Agent':
+                            'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 '
+                            '(KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        if (imageUrl != null && fallbackImageUrl != null) {
+                          return Image.network(
+                            fallbackImageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder:
+                                (context, fallbackError, fallbackStackTrace) {
+                                  return Container(
+                                    color: AppTheme.cloud,
+                                    alignment: Alignment.center,
+                                    child: Icon(
+                                      Icons.newspaper_rounded,
+                                      color: textMuted,
+                                      size: 22,
+                                    ),
+                                  );
+                                },
+                          );
+                        }
+                        return Container(
+                          color: AppTheme.cloud,
+                          alignment: Alignment.center,
+                          child: Icon(
+                            Icons.newspaper_rounded,
+                            color: textMuted,
+                            size: 22,
+                          ),
+                        );
+                      },
+                    ),
             ),
           ),
           const SizedBox(width: 12),
@@ -956,6 +1580,15 @@ class _NewsCard extends StatelessWidget {
                       color: textPrimary,
                     ),
                   ),
+                  if (summary != null && summary!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      summary!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: textMuted),
+                    ),
+                  ],
                   const SizedBox(height: 6),
                   Text(
                     source,

@@ -1,4 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
@@ -8,7 +13,9 @@ import 'home_view.dart';
 import 'login_view.dart';
 
 class OnboardingRegister extends StatefulWidget {
-  const OnboardingRegister({super.key});
+  final String? verifiedPhoneNumber;
+
+  const OnboardingRegister({super.key, this.verifiedPhoneNumber});
 
   @override
   State<OnboardingRegister> createState() => _OnboardingRegisterState();
@@ -147,13 +154,66 @@ class _OnboardingRegisterState extends State<OnboardingRegister> {
   bool nirbhayaMode = false;
   bool isOtpSent = false;
   bool isMobileVerified = false;
+  bool _isLoading = false;
+  String? _verificationId;
+  Timer? _otpResendTimer;
+  int _otpResendSeconds = 0;
+
+  String _phoneAuthErrorMessage(FirebaseAuthException error) {
+    if (error.code == 'internal-error') {
+      return 'Phone verification failed on iOS simulator. Use Firebase test phone numbers or try a real device.';
+    }
+    if (error.code == 'too-many-requests') {
+      return 'Too many OTP requests. Please wait and try again.';
+    }
+    return error.message ?? 'OTP verification failed';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final String? verifiedPhone = widget.verifiedPhoneNumber;
+    if (verifiedPhone != null && verifiedPhone.isNotEmpty) {
+      _phoneController.text = _phoneForDisplay(verifiedPhone);
+      isMobileVerified = true;
+      isOtpSent = true;
+    }
+  }
 
   @override
   void dispose() {
+    _otpResendTimer?.cancel();
     controller.dispose();
     _phoneController.dispose();
     _otpController.dispose();
     super.dispose();
+  }
+
+  void _startOtpCooldown([int seconds = 60]) {
+    _otpResendTimer?.cancel();
+    setState(() => _otpResendSeconds = seconds);
+    _otpResendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_otpResendSeconds <= 1) {
+        timer.cancel();
+        setState(() => _otpResendSeconds = 0);
+        return;
+      }
+      setState(() => _otpResendSeconds--);
+    });
+  }
+
+  Future<void> _resendOtp() async {
+    if (_otpResendSeconds > 0 || _isLoading) return;
+    setState(() {
+      isOtpSent = false;
+      _verificationId = null;
+      _otpController.clear();
+    });
+    await _sendOrVerifyOtp();
   }
 
   void nextPage() {
@@ -161,6 +221,12 @@ class _OnboardingRegisterState extends State<OnboardingRegister> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.tr('snack.verifyMobileContinue'))),
       );
+      return;
+    }
+    if (currentPage == 1 && name.trim().isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter your name.')));
       return;
     }
     if (currentPage == 2 && (selectedCity == null || selectedCity!.isEmpty)) {
@@ -178,9 +244,44 @@ class _OnboardingRegisterState extends State<OnboardingRegister> {
     }
   }
 
-  void _sendOrVerifyOtp() {
+  String _normalizePhone(String value) {
+    final String digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.startsWith('91') && digits.length >= 12) {
+      return '+${digits.substring(0, 12)}';
+    }
+    final String lastTen = digits.length >= 10
+        ? digits.substring(digits.length - 10)
+        : digits;
+    return '+91$lastTen';
+  }
+
+  String _phoneForDisplay(String value) {
+    final String digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length >= 10) {
+      return digits.substring(digits.length - 10);
+    }
+    return digits;
+  }
+
+  Future<void> _sendOrVerifyOtp() async {
+    if (isMobileVerified) {
+      nextPage();
+      return;
+    }
+
+    if (Firebase.apps.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Firebase is not configured yet. Add app config from Firebase console.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final String phone = _phoneController.text.trim();
-    if (phone.length < 10) {
+    if (phone.replaceAll(RegExp(r'[^0-9]'), '').length < 10) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(context.tr('snack.phoneInvalid'))));
@@ -188,12 +289,74 @@ class _OnboardingRegisterState extends State<OnboardingRegister> {
     }
 
     if (!isOtpSent) {
-      setState(() {
-        isOtpSent = true;
-      });
+      if (_otpResendSeconds > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Please wait $_otpResendSeconds seconds before requesting another OTP.',
+            ),
+          ),
+        );
+        return;
+      }
+      setState(() => _isLoading = true);
+      try {
+        await FirebaseAuth.instance.verifyPhoneNumber(
+          phoneNumber: _normalizePhone(phone),
+          verificationCompleted: (PhoneAuthCredential credential) async {
+            await FirebaseAuth.instance.signInWithCredential(credential);
+            if (!mounted) return;
+            setState(() {
+              isMobileVerified = true;
+              _isLoading = false;
+            });
+            controller.nextPage(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
+          },
+          verificationFailed: (FirebaseAuthException error) {
+            if (!mounted) return;
+            setState(() => _isLoading = false);
+            debugPrint(
+              'register verifyPhoneNumber failed: code=${error.code}, message=${error.message}',
+            );
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(_phoneAuthErrorMessage(error))),
+            );
+          },
+          codeSent: (String verificationId, int? _) {
+            if (!mounted) return;
+            setState(() {
+              isOtpSent = true;
+              _verificationId = verificationId;
+            });
+            _startOtpCooldown();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.tr('snack.otpSent'))),
+            );
+          },
+          codeAutoRetrievalTimeout: (String verificationId) {
+            _verificationId = verificationId;
+          },
+        );
+      } on FirebaseAuthException catch (error) {
+        debugPrint(
+          'register send OTP failed: code=${error.code}, message=${error.message}',
+        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_phoneAuthErrorMessage(error))));
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+      return;
+    }
+
+    if (_verificationId == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(context.tr('snack.otpSent'))));
+      ).showSnackBar(const SnackBar(content: Text('Please send OTP again.')));
       return;
     }
 
@@ -204,16 +367,90 @@ class _OnboardingRegisterState extends State<OnboardingRegister> {
       return;
     }
 
-    setState(() {
-      isMobileVerified = true;
-    });
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(context.tr('snack.mobileVerified'))));
-    controller.nextPage(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+    setState(() => _isLoading = true);
+    try {
+      final PhoneAuthCredential credential = PhoneAuthProvider.credential(
+        verificationId: _verificationId!,
+        smsCode: _otpController.text.trim(),
+      );
+      await FirebaseAuth.instance.signInWithCredential(credential);
+      if (!mounted) return;
+      setState(() {
+        isMobileVerified = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr('snack.mobileVerified'))),
+      );
+      controller.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } on FirebaseAuthException catch (error) {
+      debugPrint(
+        'register verify OTP failed: code=${error.code}, message=${error.message}',
+      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_phoneAuthErrorMessage(error))));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _saveProfileAndGoHome() async {
+    if (name.trim().isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter your name.')));
+      return;
+    }
+    if (selectedCity == null || selectedCity!.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr('snack.selectCityContinue'))),
+      );
+      return;
+    }
+    if (Firebase.apps.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Firebase is not configured.')),
+      );
+      return;
+    }
+    final User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please verify your mobile number first.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'name': name.trim(),
+        'city': selectedCity,
+        'nirbhayaMode': nirbhayaMode,
+        'phoneNumber':
+            user.phoneNumber ?? _normalizePhone(_phoneController.text),
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeView()),
+      );
+    } on FirebaseException catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message ?? 'Could not save profile')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -265,15 +502,6 @@ class _OnboardingRegisterState extends State<OnboardingRegister> {
                       setState(() {
                         currentPage = index;
                       });
-                      if (index == totalSteps - 1) {
-                        Future.delayed(const Duration(milliseconds: 900), () {
-                          if (!mounted) return;
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(builder: (_) => const HomeView()),
-                          );
-                        });
-                      }
                     },
                     children: [
                       _buildMobileVerificationStep(),
@@ -344,6 +572,7 @@ class _OnboardingRegisterState extends State<OnboardingRegister> {
               maxLength: 10,
               hintText: context.tr('login.mobileHint'),
               icon: Icons.phone_rounded,
+              enabled: !isMobileVerified,
             ),
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 260),
@@ -371,13 +600,41 @@ class _OnboardingRegisterState extends State<OnboardingRegister> {
                     )
                   : const SizedBox.shrink(key: ValueKey('empty')),
             ),
+            if (isOtpSent && !isMobileVerified) ...[
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _otpResendSeconds == 0 && !_isLoading
+                      ? _resendOtp
+                      : null,
+                  child: Text(
+                    _otpResendSeconds == 0
+                        ? 'Resend OTP'
+                        : 'Resend OTP in $_otpResendSeconds s',
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             _GradientButton(
-              label: isOtpSent
+              label: isMobileVerified
+                  ? context.tr('register.continue')
+                  : isOtpSent
                   ? context.tr('login.verifyOtp')
                   : context.tr('login.sendOtp'),
-              onTap: _sendOrVerifyOtp,
+              onTap: _isLoading ? () {} : _sendOrVerifyOtp,
             ),
+            if (_isLoading) ...[
+              const SizedBox(height: 10),
+              const Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ],
             if (isMobileVerified) ...[
               const SizedBox(height: 12),
               Row(
@@ -573,13 +830,10 @@ class _OnboardingRegisterState extends State<OnboardingRegister> {
             ),
             const SizedBox(height: 16),
             _GradientButton(
-              label: context.tr('register.goHome'),
-              onTap: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HomeView()),
-                );
-              },
+              label: _isLoading
+                  ? 'Saving profile...'
+                  : context.tr('register.goHome'),
+              onTap: _isLoading ? () {} : _saveProfileAndGoHome,
             ),
           ],
         ),
@@ -631,6 +885,7 @@ class _RoundedField extends StatelessWidget {
   final String hintText;
   final IconData icon;
   final ValueChanged<String>? onChanged;
+  final bool enabled;
 
   const _RoundedField({
     this.controller,
@@ -639,12 +894,14 @@ class _RoundedField extends StatelessWidget {
     required this.hintText,
     required this.icon,
     this.onChanged,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      enabled: enabled,
       keyboardType: keyboardType,
       maxLength: maxLength,
       onChanged: onChanged,

@@ -127,7 +127,10 @@ class _TrackedIssueCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.primaryNavy.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(12),
@@ -244,7 +247,11 @@ class HelplineDirectoryView extends StatelessWidget {
       _Helpline(name: 'Police', number: '100', note: 'Immediate law support'),
       _Helpline(name: 'Ambulance', number: '108', note: 'Medical emergency'),
       _Helpline(name: 'Women Helpline', number: '1091', note: 'Safety support'),
-      _Helpline(name: 'Ward Office', number: '080-22334455', note: 'Local civic office'),
+      _Helpline(
+        name: 'Ward Office',
+        number: '080-22334455',
+        note: 'Local civic office',
+      ),
     ];
 
     return Scaffold(
@@ -308,7 +315,9 @@ class HelplineDirectoryView extends StatelessWidget {
                   TextButton(
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Dialing ${line.number} (mock)')),
+                        SnackBar(
+                          content: Text('Dialing ${line.number} (mock)'),
+                        ),
                       );
                     },
                     child: Text(
@@ -513,7 +522,9 @@ class _OfflineDraftsViewState extends State<OfflineDraftsView> {
                         TextButton(
                           onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Opening draft (mock)')),
+                              const SnackBar(
+                                content: Text('Opening draft (mock)'),
+                              ),
                             );
                           },
                           child: const Text(
@@ -736,8 +747,7 @@ class FirstAidGuideView extends StatelessWidget {
                     color: AppTheme.textPrimary(context),
                   ),
                 ),
-                childrenPadding:
-                    const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
                 children: guide.steps
                     .map(
                       (step) => Padding(
@@ -810,11 +820,7 @@ class _Notice {
   final String area;
   final String time;
 
-  const _Notice({
-    required this.title,
-    required this.area,
-    required this.time,
-  });
+  const _Notice({required this.title, required this.area, required this.time});
 }
 
 class _DraftIssue {
@@ -847,8 +853,5 @@ class _FirstAidGuide {
   final String title;
   final List<String> steps;
 
-  const _FirstAidGuide({
-    required this.title,
-    required this.steps,
-  });
+  const _FirstAidGuide({required this.title, required this.steps});
 }

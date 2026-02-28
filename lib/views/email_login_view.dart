@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import '../widgets/auth_background.dart';
 import '../widgets/animated_entrance.dart';
 import 'home_view.dart';
-import 'register_view.dart';
 
 class EmailLoginView extends StatefulWidget {
   const EmailLoginView({super.key});
@@ -18,6 +20,8 @@ class _EmailLoginViewState extends State<EmailLoginView> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isActionPressed = false;
+  bool _isLoading = false;
+  bool _isRegisterMode = false;
 
   @override
   void dispose() {
@@ -26,7 +30,7 @@ class _EmailLoginViewState extends State<EmailLoginView> {
     super.dispose();
   }
 
-  void _handleEmailLogin() {
+  Future<void> _handleEmailAction() async {
     final String email = _emailController.text.trim();
     final String password = _passwordController.text.trim();
     final bool isEmailValid = RegExp(
@@ -47,24 +51,167 @@ class _EmailLoginViewState extends State<EmailLoginView> {
       return;
     }
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const HomeView()),
-    );
+    if (Firebase.apps.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Firebase is not configured yet. Add app config from Firebase console.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+    try {
+      if (_isRegisterMode) {
+        final UserCredential credential = await FirebaseAuth.instance
+            .createUserWithEmailAndPassword(email: email, password: password);
+        final User? user = credential.user;
+        if (user != null && !user.emailVerified) {
+          await user.sendEmailVerification();
+        }
+        await FirebaseAuth.instance.signOut();
+        if (!mounted) return;
+        setState(() => _isRegisterMode = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Verification email sent. Please verify your email and then login.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      final UserCredential credential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
+      await credential.user?.reload();
+      final User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login failed. Please try again.')),
+        );
+        return;
+      }
+
+      if (!currentUser.emailVerified) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Please verify your email before login.'),
+            action: SnackBarAction(
+              label: 'Resend',
+              onPressed: () {
+                currentUser.sendEmailVerification();
+              },
+            ),
+          ),
+        );
+        await FirebaseAuth.instance.signOut();
+        return;
+      }
+
+      await _ensureUserProfile(currentUser);
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeView()),
+      );
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_emailAuthErrorMessage(error))));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  void _handleForgotPassword() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(context.tr('snack.forgotSoon'))));
+  String _emailAuthErrorMessage(FirebaseAuthException error) {
+    switch (error.code) {
+      case 'email-already-in-use':
+        return 'This email is already registered. Please login.';
+      case 'invalid-credential':
+      case 'wrong-password':
+      case 'user-not-found':
+        return 'Invalid email or password.';
+      case 'weak-password':
+        return 'Password is too weak.';
+      case 'network-request-failed':
+        return 'No internet connection. Please try again.';
+      case 'too-many-requests':
+        return 'Too many attempts. Try again after some time.';
+      default:
+        return error.message ?? 'Authentication failed.';
+    }
   }
 
-  void _handleRegister() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const OnboardingRegister()),
-    );
+  Future<void> _ensureUserProfile(User user) async {
+    final DocumentReference<Map<String, dynamic>> ref = FirebaseFirestore
+        .instance
+        .collection('users')
+        .doc(user.uid);
+    final DocumentSnapshot<Map<String, dynamic>> snapshot = await ref.get();
+    if (snapshot.exists) return;
+    final String fallbackName = user.email?.split('@').first ?? 'Citizen';
+    await ref.set({
+      'uid': user.uid,
+      'name': fallbackName,
+      'email': user.email,
+      'city': '',
+      'nirbhayaMode': false,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
+
+  Future<void> _handleForgotPassword() async {
+    final String email = _emailController.text.trim();
+    final bool isEmailValid = RegExp(
+      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+    ).hasMatch(email);
+    if (!isEmailValid) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.tr('snack.emailInvalid'))));
+      return;
+    }
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password reset link sent to your email.'),
+        ),
+      );
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_emailAuthErrorMessage(error))));
+    }
+  }
+
+  void _toggleRegisterMode() {
+    setState(() {
+      _isRegisterMode = !_isRegisterMode;
+    });
+  }
+
+  String get _title => _isRegisterMode
+      ? 'Create account with email'
+      : context.tr('emailLogin.title');
+  String get _subtitle => _isRegisterMode
+      ? 'Create your account and verify your email before login.'
+      : context.tr('emailLogin.subtitle');
+  String get _buttonLabel => _isRegisterMode
+      ? context.tr('emailLogin.register')
+      : context.tr('emailLogin.login');
+  String get _toggleLabel => _isRegisterMode
+      ? 'Already have an account? Login'
+      : context.tr('emailLogin.register');
 
   @override
   Widget build(BuildContext context) {
@@ -95,7 +242,7 @@ class _EmailLoginViewState extends State<EmailLoginView> {
                 AnimatedEntrance(
                   delay: const Duration(milliseconds: 120),
                   child: Text(
-                    context.tr('emailLogin.title'),
+                    _title,
                     style: GoogleFonts.outfit(
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
@@ -107,7 +254,7 @@ class _EmailLoginViewState extends State<EmailLoginView> {
                 AnimatedEntrance(
                   delay: const Duration(milliseconds: 180),
                   child: Text(
-                    context.tr('emailLogin.subtitle'),
+                    _subtitle,
                     style: GoogleFonts.manrope(fontSize: 14, color: textMuted),
                   ),
                 ),
@@ -134,9 +281,9 @@ class _EmailLoginViewState extends State<EmailLoginView> {
                           ),
                         ),
                         _GradientButton(
-                          label: context.tr('emailLogin.login'),
+                          label: _isLoading ? 'Please wait...' : _buttonLabel,
                           isPressed: _isActionPressed,
-                          onTap: _handleEmailLogin,
+                          onTap: _isLoading ? () {} : _handleEmailAction,
                           onHighlightChanged: (isPressed) {
                             setState(() {
                               _isActionPressed = isPressed;
@@ -152,9 +299,9 @@ class _EmailLoginViewState extends State<EmailLoginView> {
                   delay: const Duration(milliseconds: 320),
                   child: Center(
                     child: TextButton(
-                      onPressed: _handleRegister,
+                      onPressed: _toggleRegisterMode,
                       child: Text(
-                        context.tr('emailLogin.register'),
+                        _toggleLabel,
                         style: TextStyle(
                           color: AppTheme.primaryNavy,
                           fontWeight: FontWeight.w700,

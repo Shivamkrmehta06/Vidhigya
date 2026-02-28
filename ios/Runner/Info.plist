@@ -22,6 +22,17 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>app-1-21066710717-ios-33f56bca94b9fb57ee01d4</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
@@ -51,5 +62,7 @@
 	<string>Allow camera access to attach photos to community posts.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Allow photo access to attach images to community posts.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Allow microphone access while recording safety videos in TRATA mode.</string>
 </dict>
 </plist>

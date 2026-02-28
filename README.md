@@ -2,6 +2,22 @@
 
 A new Flutter project.
 
+## Firebase Setup (Direct From Flutter)
+
+This project uses direct Firebase integration from Flutter (no Node.js backend required):
+
+- Firebase Authentication
+- Cloud Firestore
+- Firebase Storage
+
+### Firebase Rules Deploy
+
+From repo root:
+
+1. `firebase login`
+2. `firebase use vidhigya-v1`
+3. `firebase deploy --only firestore:rules,firestore:indexes,storage`
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.

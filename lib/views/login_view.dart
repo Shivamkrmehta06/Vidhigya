@@ -1,4 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
@@ -20,15 +25,68 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _otpController = TextEditingController();
   bool _otpSent = false;
   bool _isActionPressed = false;
+  bool _isLoading = false;
+  String? _verificationId;
+  Timer? _otpResendTimer;
+  int _otpResendSeconds = 0;
+
+  String _phoneAuthErrorMessage(FirebaseAuthException error) {
+    if (error.code == 'internal-error') {
+      return 'Phone verification failed on iOS simulator. Use Firebase test phone numbers or try a real device.';
+    }
+    if (error.code == 'too-many-requests') {
+      return 'Too many OTP requests. Please wait and try again.';
+    }
+    return error.message ?? 'OTP verification failed';
+  }
 
   @override
   void dispose() {
+    _otpResendTimer?.cancel();
     _phoneController.dispose();
     _otpController.dispose();
     super.dispose();
   }
 
-  void _handleOtpFlow() {
+  void _startOtpCooldown([int seconds = 60]) {
+    _otpResendTimer?.cancel();
+    setState(() => _otpResendSeconds = seconds);
+    _otpResendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_otpResendSeconds <= 1) {
+        timer.cancel();
+        setState(() => _otpResendSeconds = 0);
+        return;
+      }
+      setState(() => _otpResendSeconds--);
+    });
+  }
+
+  Future<void> _resendOtp() async {
+    if (_otpResendSeconds > 0 || _isLoading) return;
+    setState(() {
+      _otpSent = false;
+      _verificationId = null;
+      _otpController.clear();
+    });
+    await _handleOtpFlow();
+  }
+
+  Future<void> _handleOtpFlow() async {
+    if (Firebase.apps.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Firebase is not configured yet. Add app config from Firebase console.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final String phone = _phoneController.text.trim();
     if (phone.length < 10) {
       ScaffoldMessenger.of(
@@ -38,12 +96,69 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (!_otpSent) {
-      setState(() {
-        _otpSent = true;
-      });
+      if (_otpResendSeconds > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Please wait $_otpResendSeconds seconds before requesting another OTP.',
+            ),
+          ),
+        );
+        return;
+      }
+      setState(() => _isLoading = true);
+      try {
+        final String normalizedPhone = phone.startsWith('+')
+            ? phone
+            : '+91${phone.substring(phone.length - 10)}';
+        await FirebaseAuth.instance.verifyPhoneNumber(
+          phoneNumber: normalizedPhone,
+          verificationCompleted: (credential) async {
+            final UserCredential userCredential = await FirebaseAuth.instance
+                .signInWithCredential(credential);
+            await _routeAfterLogin(userCredential.user);
+          },
+          verificationFailed: (error) {
+            if (!mounted) return;
+            debugPrint(
+              'verifyPhoneNumber failed: code=${error.code}, message=${error.message}',
+            );
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(_phoneAuthErrorMessage(error))),
+            );
+          },
+          codeSent: (verificationId, _) {
+            if (!mounted) return;
+            setState(() {
+              _otpSent = true;
+              _verificationId = verificationId;
+            });
+            _startOtpCooldown();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.tr('snack.otpSent'))),
+            );
+          },
+          codeAutoRetrievalTimeout: (verificationId) {
+            _verificationId = verificationId;
+          },
+        );
+      } on FirebaseAuthException catch (error) {
+        debugPrint(
+          'send OTP failed: code=${error.code}, message=${error.message}',
+        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_phoneAuthErrorMessage(error))));
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+      return;
+    }
+
+    if (_verificationId == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(context.tr('snack.otpSent'))));
+      ).showSnackBar(const SnackBar(content: Text('Please send OTP again.')));
       return;
     }
 
@@ -54,13 +169,53 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(context.tr('snack.loginSuccess'))));
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const HomeView()),
-    );
+    setState(() => _isLoading = true);
+    try {
+      final PhoneAuthCredential credential = PhoneAuthProvider.credential(
+        verificationId: _verificationId!,
+        smsCode: _otpController.text.trim(),
+      );
+      final UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithCredential(credential);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.tr('snack.loginSuccess'))));
+      await _routeAfterLogin(userCredential.user);
+    } on FirebaseAuthException catch (error) {
+      debugPrint(
+        'verify OTP failed: code=${error.code}, message=${error.message}',
+      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_phoneAuthErrorMessage(error))));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _routeAfterLogin(User? user) async {
+    if (user == null || !mounted) return;
+    final DocumentSnapshot<Map<String, dynamic>> profile =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+    if (!mounted) return;
+    if (profile.exists) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeView()),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              OnboardingRegister(verifiedPhoneNumber: user.phoneNumber),
+        ),
+      );
+    }
   }
 
   void _handleEmailLogin() {
@@ -170,19 +325,45 @@ class _LoginScreenState extends State<LoginScreen> {
                                 )
                               : const SizedBox.shrink(key: ValueKey('empty')),
                         ),
+                        if (_otpSent) ...[
+                          const SizedBox(height: 4),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _otpResendSeconds == 0 && !_isLoading
+                                  ? _resendOtp
+                                  : null,
+                              child: Text(
+                                _otpResendSeconds == 0
+                                    ? 'Resend OTP'
+                                    : 'Resend OTP in $_otpResendSeconds s',
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 18),
                         _GradientButton(
                           label: _otpSent
                               ? context.tr('login.verifyOtp')
                               : context.tr('login.sendOtp'),
                           isPressed: _isActionPressed,
-                          onTap: _handleOtpFlow,
+                          onTap: _isLoading ? () {} : _handleOtpFlow,
                           onHighlightChanged: (isPressed) {
                             setState(() {
                               _isActionPressed = isPressed;
                             });
                           },
                         ),
+                        if (_isLoading) ...[
+                          const SizedBox(height: 10),
+                          const Center(
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 10),
                         Align(
                           alignment: Alignment.centerRight,

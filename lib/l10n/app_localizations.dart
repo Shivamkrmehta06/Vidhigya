@@ -104,9 +104,9 @@ class AppLocalizations {
     'en': {
       'common.seeAll': 'See all',
       'snack.phoneInvalid': 'Enter a valid 10-digit mobile number.',
-      'snack.otpSent': 'OTP sent successfully (mock: 123456).',
+      'snack.otpSent': 'OTP sent successfully.',
       'snack.otpInvalid': 'Enter a valid 6-digit OTP.',
-      'snack.loginSuccess': 'OTP verified. Login successful (mock).',
+      'snack.loginSuccess': 'OTP verified. Login successful.',
       'snack.emailInvalid': 'Enter a valid email address.',
       'snack.passwordShort': 'Password should be at least 6 characters.',
       'snack.forgotSoon': 'Forgot password flow coming next.',
