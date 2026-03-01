@@ -794,7 +794,7 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
                           _QuickAction(
                             icon: Icons.auto_awesome_rounded,
                             label: l10n.t('home.pratyukti'),
-                            accent: AppTheme.mist,
+                            accent: AppTheme.skyAccent,
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(

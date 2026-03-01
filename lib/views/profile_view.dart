@@ -237,236 +237,380 @@ class _ProfileViewState extends State<ProfileView> {
     if (!firebaseReady || currentUser == null) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        body: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                'Login required to view profile.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.manrope(color: AppTheme.textMuted(context)),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: AnimatedEntrance(
-          child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance
-                .collection('users')
-                .doc(currentUser.uid)
-                .snapshots(),
-            builder: (context, profileSnapshot) {
-              final Map<String, dynamic> data =
-                  profileSnapshot.data?.data() ?? <String, dynamic>{};
-              final String name = _titleCaseName(
-                (data['name'] as String?)?.trim().isNotEmpty == true
-                    ? data['name'] as String
-                    : _fallbackNameFromUser(currentUser),
-              );
-              final String email = (currentUser.email ?? data['email'] ?? '')
-                  .toString()
-                  .trim();
-              final String city = (data['city'] ?? '').toString().trim();
-              final bool emailVerified = currentUser.emailVerified;
-              final bool hasEmail = email.isNotEmpty;
-
-              return SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+        body: Stack(
+          children: [
+            const _ScreenBackdrop(),
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                    child: Row(
                       children: [
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.arrow_back_rounded),
-                          color: AppTheme.primaryNavy,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          context.tr('profile.title'),
-                          style: GoogleFonts.outfit(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: textPrimary,
-                          ),
+                        _TopIconBubble(
+                          icon: Icons.arrow_back_rounded,
+                          onTap: () => Navigator.pop(context),
                         ),
                         const Spacer(),
                         Hero(
                           tag: 'vidhigya-wordmark',
                           child: Image.asset(
                             'assets/images/vidhigya_wordmark.png',
-                            height: 22,
+                            height: 24,
                             fit: BoxFit.contain,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    _ProfileHeader(
-                      name: name,
-                      userId: currentUser.uid,
-                      onEdit: _isProfileSaving
-                          ? null
-                          : () => _openEditProfileDialog(
-                              user: currentUser,
-                              currentName: name,
-                              currentCity: city,
-                            ),
-                    ),
-                    const SizedBox(height: 18),
-                    _SectionTitle(title: context.tr('profile.account')),
-                    const SizedBox(height: 8),
-                    _InfoTile(
-                      icon: Icons.phone_outlined,
-                      title: _displayPhone(data, currentUser),
-                      subtitle: context.tr('profile.primaryNumber'),
-                    ),
-                    _InfoTile(
-                      icon: Icons.email_outlined,
-                      title: email.isEmpty ? 'Not set' : email,
-                      subtitle: hasEmail
-                          ? '${context.tr('profile.emailAddress')} • ${emailVerified ? 'Verified' : 'Unverified'}'
-                          : context.tr('profile.emailAddress'),
-                      trailing: _EmailActionButton(
-                        hasEmail: hasEmail,
-                        emailVerified: emailVerified,
-                        isBusy: _isEmailBusy,
-                        onAddEmail: () => _openAddEmailDialog(currentUser),
-                        onSendVerification: () =>
-                            _sendEmailVerification(currentUser),
-                        onRefreshStatus: () => _refreshUser(currentUser),
-                      ),
-                    ),
-                    _InfoTile(
-                      icon: Icons.place_outlined,
-                      title: city.isEmpty ? 'Not set' : city,
-                      subtitle: context.tr('profile.homeLocation'),
-                    ),
-                    const SizedBox(height: 18),
-                    _SectionTitle(title: context.tr('profile.safety')),
-                    const SizedBox(height: 8),
-                    _SwitchTile(
-                      title: context.tr('profile.autoRecord'),
-                      subtitle: context.tr('profile.storeEvidence'),
-                      value: _trataAutoRecord,
-                      onChanged: (value) =>
-                          setState(() => _trataAutoRecord = value),
-                    ),
-                    _InfoTile(
-                      icon: Icons.shield_outlined,
-                      title: context.tr('profile.emergencyContacts'),
-                      subtitle: context.tr('profile.contactsConfigured'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                    ),
-                    const SizedBox(height: 18),
-                    _SectionTitle(title: context.tr('profile.notifications')),
-                    const SizedBox(height: 8),
-                    _SwitchTile(
-                      title: context.tr('profile.appNotifications'),
-                      subtitle: context.tr('profile.issueUpdates'),
-                      value: _notifications,
-                      onChanged: (value) =>
-                          setState(() => _notifications = value),
-                    ),
-                    _SwitchTile(
-                      title: context.tr('profile.communityAlerts'),
-                      subtitle: context.tr('profile.nearbyAlerts'),
-                      value: _communityAlerts,
-                      onChanged: (value) =>
-                          setState(() => _communityAlerts = value),
-                    ),
-                    _SwitchTile(
-                      title: context.tr('profile.silentNight'),
-                      subtitle: context.tr('profile.muteNight'),
-                      value: _silentNight,
-                      onChanged: (value) =>
-                          setState(() => _silentNight = value),
-                    ),
-                    const SizedBox(height: 18),
-                    _SectionTitle(title: context.tr('profile.language')),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface(context),
-                        borderRadius: BorderRadius.circular(AppTheme.radius),
-                        border: Border.all(color: AppTheme.border(context)),
-                        boxShadow: AppTheme.softShadow,
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<Locale>(
-                          value: activeLanguage.locale,
-                          isExpanded: true,
-                          hint: Text(context.tr('profile.selectLanguage')),
-                          items: AppLocalizations.languages
-                              .map(
-                                (language) => DropdownMenuItem<Locale>(
-                                  value: language.locale,
-                                  child: Text(language.dropdownLabel),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (locale) {
-                            if (locale == null) return;
-                            settings.setLocale(locale);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  context.tr('snack.languageUpdated'),
-                                ),
-                              ),
-                            );
-                          },
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        context.tr('profile.title'),
+                        style: GoogleFonts.outfit(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w700,
+                          color: textPrimary,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    _SectionTitle(title: context.tr('profile.support')),
-                    const SizedBox(height: 8),
-                    _InfoTile(
-                      icon: Icons.help_outline,
-                      title: context.tr('profile.helpCenter'),
-                      subtitle: context.tr('profile.faqSupport'),
-                    ),
-                    _InfoTile(
-                      icon: Icons.description_outlined,
-                      title: context.tr('profile.termsPrivacy'),
-                      subtitle: context.tr('profile.policiesData'),
-                    ),
-                    const SizedBox(height: 18),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: _isSigningOut ? null : _handleSignOut,
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          foregroundColor: AppTheme.primaryNavy,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface(context),
+                          borderRadius: BorderRadius.circular(AppTheme.radius),
+                          border: Border.all(color: AppTheme.border(context)),
+                          boxShadow: AppTheme.softShadow,
                         ),
                         child: Text(
-                          _isSigningOut
-                              ? 'Signing out...'
-                              : _isProfileSaving
-                              ? 'Saving profile...'
-                              : context.tr('profile.signOut'),
+                          'Login required to view profile.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.manrope(
+                            color: AppTheme.textMuted(context),
+                          ),
                         ),
                       ),
                     ),
-                  ],
-                ),
-              );
-            },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: Stack(
+        children: [
+          const _ScreenBackdrop(),
+          SafeArea(
+            child: AnimatedEntrance(
+              child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(currentUser.uid)
+                    .snapshots(),
+                builder: (context, profileSnapshot) {
+                  final Map<String, dynamic> data =
+                      profileSnapshot.data?.data() ?? <String, dynamic>{};
+                  final String name = _titleCaseName(
+                    (data['name'] as String?)?.trim().isNotEmpty == true
+                        ? data['name'] as String
+                        : _fallbackNameFromUser(currentUser),
+                  );
+                  final String email =
+                      (currentUser.email ?? data['email'] ?? '')
+                          .toString()
+                          .trim();
+                  final String city = (data['city'] ?? '').toString().trim();
+                  final bool emailVerified = currentUser.emailVerified;
+                  final bool hasEmail = email.isNotEmpty;
+
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            _TopIconBubble(
+                              icon: Icons.arrow_back_rounded,
+                              onTap: () => Navigator.pop(context),
+                            ),
+                            const Spacer(),
+                            Hero(
+                              tag: 'vidhigya-wordmark',
+                              child: Image.asset(
+                                'assets/images/vidhigya_wordmark.png',
+                                height: 24,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          context.tr('profile.title'),
+                          style: GoogleFonts.outfit(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w700,
+                            color: textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Manage your identity, safety settings, and account access.',
+                          style: GoogleFonts.manrope(
+                            fontSize: 13,
+                            color: AppTheme.textMuted(context),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _ProfileHeader(
+                          name: name,
+                          userId: currentUser.uid,
+                          onEdit: _isProfileSaving
+                              ? null
+                              : () => _openEditProfileDialog(
+                                  user: currentUser,
+                                  currentName: name,
+                                  currentCity: city,
+                                ),
+                        ),
+                        const SizedBox(height: 18),
+                        _SectionTitle(title: context.tr('profile.account')),
+                        const SizedBox(height: 8),
+                        _InfoTile(
+                          icon: Icons.phone_outlined,
+                          title: _displayPhone(data, currentUser),
+                          subtitle: context.tr('profile.primaryNumber'),
+                        ),
+                        _InfoTile(
+                          icon: Icons.email_outlined,
+                          title: email.isEmpty ? 'Not set' : email,
+                          subtitle: hasEmail
+                              ? '${context.tr('profile.emailAddress')} • ${emailVerified ? 'Verified' : 'Unverified'}'
+                              : context.tr('profile.emailAddress'),
+                          trailing: _EmailActionButton(
+                            hasEmail: hasEmail,
+                            emailVerified: emailVerified,
+                            isBusy: _isEmailBusy,
+                            onAddEmail: () => _openAddEmailDialog(currentUser),
+                            onSendVerification: () =>
+                                _sendEmailVerification(currentUser),
+                            onRefreshStatus: () => _refreshUser(currentUser),
+                          ),
+                        ),
+                        _InfoTile(
+                          icon: Icons.place_outlined,
+                          title: city.isEmpty ? 'Not set' : city,
+                          subtitle: context.tr('profile.homeLocation'),
+                        ),
+                        const SizedBox(height: 18),
+                        _SectionTitle(title: context.tr('profile.safety')),
+                        const SizedBox(height: 8),
+                        _SwitchTile(
+                          title: context.tr('profile.autoRecord'),
+                          subtitle: context.tr('profile.storeEvidence'),
+                          value: _trataAutoRecord,
+                          onChanged: (value) =>
+                              setState(() => _trataAutoRecord = value),
+                        ),
+                        _InfoTile(
+                          icon: Icons.shield_outlined,
+                          title: context.tr('profile.emergencyContacts'),
+                          subtitle: context.tr('profile.contactsConfigured'),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                        ),
+                        const SizedBox(height: 18),
+                        _SectionTitle(
+                          title: context.tr('profile.notifications'),
+                        ),
+                        const SizedBox(height: 8),
+                        _SwitchTile(
+                          title: context.tr('profile.appNotifications'),
+                          subtitle: context.tr('profile.issueUpdates'),
+                          value: _notifications,
+                          onChanged: (value) =>
+                              setState(() => _notifications = value),
+                        ),
+                        _SwitchTile(
+                          title: context.tr('profile.communityAlerts'),
+                          subtitle: context.tr('profile.nearbyAlerts'),
+                          value: _communityAlerts,
+                          onChanged: (value) =>
+                              setState(() => _communityAlerts = value),
+                        ),
+                        _SwitchTile(
+                          title: context.tr('profile.silentNight'),
+                          subtitle: context.tr('profile.muteNight'),
+                          value: _silentNight,
+                          onChanged: (value) =>
+                              setState(() => _silentNight = value),
+                        ),
+                        const SizedBox(height: 18),
+                        _SectionTitle(title: context.tr('profile.language')),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surface(context),
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radius,
+                            ),
+                            border: Border.all(color: AppTheme.border(context)),
+                            boxShadow: AppTheme.softShadow,
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<Locale>(
+                              value: activeLanguage.locale,
+                              isExpanded: true,
+                              hint: Text(context.tr('profile.selectLanguage')),
+                              items: AppLocalizations.languages
+                                  .map(
+                                    (language) => DropdownMenuItem<Locale>(
+                                      value: language.locale,
+                                      child: Text(language.dropdownLabel),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (locale) {
+                                if (locale == null) return;
+                                settings.setLocale(locale);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      context.tr('snack.languageUpdated'),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        _SectionTitle(title: context.tr('profile.support')),
+                        const SizedBox(height: 8),
+                        _InfoTile(
+                          icon: Icons.help_outline,
+                          title: context.tr('profile.helpCenter'),
+                          subtitle: context.tr('profile.faqSupport'),
+                        ),
+                        _InfoTile(
+                          icon: Icons.description_outlined,
+                          title: context.tr('profile.termsPrivacy'),
+                          subtitle: context.tr('profile.policiesData'),
+                        ),
+                        const SizedBox(height: 18),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: _isSigningOut ? null : _handleSignOut,
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              foregroundColor: AppTheme.primaryNavy,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: Text(
+                              _isSigningOut
+                                  ? 'Signing out...'
+                                  : _isProfileSaving
+                                  ? 'Saving profile...'
+                                  : context.tr('profile.signOut'),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScreenBackdrop extends StatelessWidget {
+  const _ScreenBackdrop();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [AppTheme.cloud, AppTheme.mist],
+              ),
+            ),
           ),
         ),
+        Positioned(
+          left: -86,
+          top: 108,
+          child: Container(
+            width: 250,
+            height: 250,
+            decoration: BoxDecoration(
+              color: AppTheme.tealAccent.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        Positioned(
+          right: -74,
+          bottom: 150,
+          child: Container(
+            width: 230,
+            height: 230,
+            decoration: BoxDecoration(
+              color: AppTheme.purpleAccent.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TopIconBubble extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _TopIconBubble({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: AppTheme.surface(context),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.border(context)),
+          boxShadow: AppTheme.softShadow,
+        ),
+        alignment: Alignment.center,
+        child: Icon(icon, size: 21, color: AppTheme.primaryNavy),
       ),
     );
   }

@@ -56,100 +56,109 @@ class _ReportsViewState extends State<ReportsView> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: AnimatedEntrance(
-          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance
-                .collection('reports')
-                .where('createdBy', isEqualTo: user.uid)
-                .orderBy('createdAt', descending: true)
-                .snapshots(),
-            builder: (context, snapshot) {
-              final List<_ReportItem> reports = snapshot.hasData
-                  ? snapshot.data!.docs.map(_reportFromDoc).toList()
-                  : const <_ReportItem>[];
-              final List<_ReportItem> filteredReports = _filteredReports(
-                reports,
-              );
-              final _ReportSummary summary = _ReportSummary.fromReports(
-                reports,
-              );
+      body: Stack(
+        children: [
+          const _ScreenBackdrop(),
+          SafeArea(
+            child: AnimatedEntrance(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('reports')
+                    .where('createdBy', isEqualTo: user.uid)
+                    .orderBy('createdAt', descending: true)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  final List<_ReportItem> reports = snapshot.hasData
+                      ? snapshot.data!.docs.map(_reportFromDoc).toList()
+                      : const <_ReportItem>[];
+                  final List<_ReportItem> filteredReports = _filteredReports(
+                    reports,
+                  );
+                  final _ReportSummary summary = _ReportSummary.fromReports(
+                    reports,
+                  );
 
-              return Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.arrow_back_rounded),
-                          color: AppTheme.primaryNavy,
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                        child: Row(
+                          children: [
+                            _TopIconBubble(
+                              icon: Icons.arrow_back_rounded,
+                              onTap: () => Navigator.pop(context),
+                            ),
+                            const Spacer(),
+                            Hero(
+                              tag: 'vidhigya-wordmark',
+                              child: Image.asset(
+                                'assets/images/vidhigya_wordmark.png',
+                                height: 24,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'My Reports',
-                          style: GoogleFonts.outfit(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary(context),
-                          ),
-                        ),
-                        const Spacer(),
-                        Hero(
-                          tag: 'vidhigya-wordmark',
-                          child: Image.asset(
-                            'assets/images/vidhigya_wordmark.png',
-                            height: 22,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                    child: Text(
-                      'Track status, follow updates, and keep your community moving.',
-                      style: GoogleFonts.manrope(
-                        fontSize: 13,
-                        color: AppTheme.textMuted(context),
                       ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    child: _SearchBar(
-                      controller: _searchController,
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: _SummaryRow(summary: summary),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: _FilterPopupBar(
-                      selected: _selectedFilter,
-                      onSelect: (value) {
-                        setState(() {
-                          _selectedFilter = value;
-                        });
-                      },
-                    ),
-                  ),
-                  Expanded(
-                    child: _buildListState(
-                      snapshot: snapshot,
-                      filteredReports: filteredReports,
-                    ),
-                  ),
-                ],
-              );
-            },
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'My Reports',
+                            style: GoogleFonts.outfit(
+                              fontSize: 30,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textPrimary(context),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                        child: Text(
+                          'Track status, follow updates, and keep your community moving.',
+                          style: GoogleFonts.manrope(
+                            fontSize: 13,
+                            color: AppTheme.textMuted(context),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                        child: _SearchBar(
+                          controller: _searchController,
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: _SummaryRow(summary: summary),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: _FilterPopupBar(
+                          selected: _selectedFilter,
+                          onSelect: (value) {
+                            setState(() {
+                              _selectedFilter = value;
+                            });
+                          },
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildListState(
+                          snapshot: snapshot,
+                          filteredReports: filteredReports,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -410,46 +419,144 @@ class _InfoScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    color: AppTheme.primaryNavy,
+      body: Stack(
+        children: [
+          const _ScreenBackdrop(),
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                  child: Row(
+                    children: [
+                      _TopIconBubble(
+                        icon: Icons.arrow_back_rounded,
+                        onTap: () => Navigator.pop(context),
+                      ),
+                      const Spacer(),
+                      Hero(
+                        tag: 'vidhigya-wordmark',
+                        child: Image.asset(
+                          'assets/images/vidhigya_wordmark.png',
+                          height: 24,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    title,
-                    style: GoogleFonts.outfit(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary(context),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.manrope(
-                      color: AppTheme.textMuted(context),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary(context),
+                      ),
                     ),
                   ),
                 ),
+                Expanded(
+                  child: Center(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface(context),
+                        borderRadius: BorderRadius.circular(AppTheme.radius),
+                        border: Border.all(color: AppTheme.border(context)),
+                        boxShadow: AppTheme.softShadow,
+                      ),
+                      child: Text(
+                        message,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.manrope(
+                          color: AppTheme.textMuted(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScreenBackdrop extends StatelessWidget {
+  const _ScreenBackdrop();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [AppTheme.cloud, AppTheme.mist],
               ),
             ),
-          ],
+          ),
         ),
+        Positioned(
+          left: -86,
+          top: 108,
+          child: Container(
+            width: 250,
+            height: 250,
+            decoration: BoxDecoration(
+              color: AppTheme.tealAccent.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        Positioned(
+          right: -74,
+          bottom: 150,
+          child: Container(
+            width: 230,
+            height: 230,
+            decoration: BoxDecoration(
+              color: AppTheme.purpleAccent.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TopIconBubble extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _TopIconBubble({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: AppTheme.surface(context),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.border(context)),
+          boxShadow: AppTheme.softShadow,
+        ),
+        alignment: Alignment.center,
+        child: Icon(icon, size: 21, color: AppTheme.primaryNavy),
       ),
     );
   }

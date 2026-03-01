@@ -30,9 +30,11 @@ class PratyuktiCopilotView extends StatefulWidget {
   State<PratyuktiCopilotView> createState() => _PratyuktiCopilotViewState();
 }
 
-class _PratyuktiCopilotViewState extends State<PratyuktiCopilotView> {
+class _PratyuktiCopilotViewState extends State<PratyuktiCopilotView>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  late final AnimationController _bgOrbController;
   final List<_ChatMessage> _messages = [
     const _ChatMessage(
       role: _ChatRole.ai,
@@ -46,9 +48,19 @@ class _PratyuktiCopilotViewState extends State<PratyuktiCopilotView> {
   bool _thinking = false;
 
   @override
+  void initState() {
+    super.initState();
+    _bgOrbController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 8200),
+    )..repeat(reverse: true);
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
+    _bgOrbController.dispose();
     super.dispose();
   }
 
@@ -331,152 +343,264 @@ class _PratyuktiCopilotViewState extends State<PratyuktiCopilotView> {
           ],
         ),
       ),
-      body: AnimatedEntrance(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                decoration: BoxDecoration(
-                  color: AppTheme.surface(context),
-                  borderRadius: BorderRadius.circular(AppTheme.radius),
-                  border: Border.all(color: AppTheme.border(context)),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [AppTheme.cloud, AppTheme.mist],
                 ),
-                child: Column(
-                  children: [
-                    Row(
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: _PratyuktiBackgroundOrbs(animation: _bgOrbController),
+            ),
+          ),
+          AnimatedEntrance(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface(context),
+                      borderRadius: BorderRadius.circular(AppTheme.radius),
+                      border: Border.all(color: AppTheme.border(context)),
+                    ),
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _controller,
-                            decoration: InputDecoration(
-                              hintText: 'Ask Pratyukti about this issue...',
-                              isDense: true,
-                              filled: true,
-                              fillColor: AppTheme.surface(context),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(
-                                  AppTheme.radiusSm,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _controller,
+                                decoration: InputDecoration(
+                                  hintText: 'Ask Pratyukti about this issue...',
+                                  isDense: true,
+                                  filled: true,
+                                  fillColor: AppTheme.surface(context),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppTheme.radiusSm,
+                                    ),
+                                    borderSide: BorderSide.none,
+                                  ),
                                 ),
-                                borderSide: BorderSide.none,
+                                onSubmitted: (_) => _sendPrompt(),
                               ),
                             ),
-                            onSubmitted: (_) => _sendPrompt(),
-                          ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              onPressed: () => _sendPrompt(),
+                              icon: const Icon(Icons.send_rounded),
+                              color: AppTheme.primaryNavy,
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          onPressed: () => _sendPrompt(),
-                          icon: const Icon(Icons.send_rounded),
-                          color: AppTheme.primaryNavy,
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: 34,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              _PromptChip(
+                                label: 'What can I report here?',
+                                onTap: () =>
+                                    _sendPrompt('What can I report here?'),
+                              ),
+                              _PromptChip(
+                                label: 'Is this urgent?',
+                                onTap: () => _sendPrompt('Is this urgent?'),
+                              ),
+                              _PromptChip(
+                                label: 'Who handles this issue?',
+                                onTap: () =>
+                                    _sendPrompt('Who handles this issue?'),
+                              ),
+                              _PromptChip(
+                                label: 'Track my latest report',
+                                onTap: () => _sendPrompt(
+                                  'Track my latest report status',
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 34,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: [
-                          _PromptChip(
-                            label: 'What can I report here?',
-                            onTap: () => _sendPrompt('What can I report here?'),
-                          ),
-                          _PromptChip(
-                            label: 'Is this urgent?',
-                            onTap: () => _sendPrompt('Is this urgent?'),
-                          ),
-                          _PromptChip(
-                            label: 'Who handles this issue?',
-                            onTap: () => _sendPrompt('Who handles this issue?'),
-                          ),
-                          _PromptChip(
-                            label: 'Track my latest report',
-                            onTap: () =>
-                                _sendPrompt('Track my latest report status'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
-                itemCount:
-                    _messages.length +
-                    (_thinking ? 1 : 0) +
-                    (_analysis == null ? 0 : 1),
-                itemBuilder: (context, index) {
-                  if (index < _messages.length) {
-                    final message = _messages[index];
-                    return _MessageBubble(message: message);
-                  }
-                  int cursor = _messages.length;
-                  if (_thinking) {
-                    if (index == cursor) {
-                      return const _TypingBubble();
-                    }
-                    cursor += 1;
-                  }
-                  if (_analysis != null && index == cursor) {
-                    return _AnalysisCard(
-                      analysis: _analysis!,
-                      onUseInReport: _applyToReport,
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-              decoration: BoxDecoration(
-                color: AppTheme.surface(context),
-                border: Border(
-                  top: BorderSide(color: AppTheme.border(context)),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
+                    itemCount:
+                        _messages.length +
+                        (_thinking ? 1 : 0) +
+                        (_analysis == null ? 0 : 1),
+                    itemBuilder: (context, index) {
+                      if (index < _messages.length) {
+                        final message = _messages[index];
+                        return _MessageBubble(message: message);
+                      }
+                      int cursor = _messages.length;
+                      if (_thinking) {
+                        if (index == cursor) {
+                          return const _TypingBubble();
+                        }
+                        cursor += 1;
+                      }
+                      if (_analysis != null && index == cursor) {
+                        return _AnalysisCard(
+                          analysis: _analysis!,
+                          onUseInReport: _applyToReport,
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
                 ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _scanning ? null : _scanImage,
-                      icon: Icon(
-                        _scanning ? Icons.hourglass_bottom : Icons.camera_alt,
-                      ),
-                      label: Text(_scanning ? 'Scanning...' : 'Scan Photo'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.primaryNavy,
-                        side: BorderSide(color: AppTheme.border(context)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface(context),
+                    border: Border(
+                      top: BorderSide(color: AppTheme.border(context)),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _analysis == null ? null : _applyToReport,
-                      icon: const Icon(Icons.assignment_turned_in_outlined),
-                      label: const Text('Use in Report'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryNavy,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _scanning ? null : _scanImage,
+                          icon: Icon(
+                            _scanning
+                                ? Icons.hourglass_bottom
+                                : Icons.camera_alt,
+                          ),
+                          label: Text(_scanning ? 'Scanning...' : 'Scan Photo'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.primaryNavy,
+                            side: BorderSide(color: AppTheme.border(context)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _analysis == null ? null : _applyToReport,
+                          icon: const Icon(Icons.assignment_turned_in_outlined),
+                          label: const Text('Use in Report'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryNavy,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+class _PratyuktiBackgroundOrbs extends StatelessWidget {
+  final Animation<double> animation;
+
+  const _PratyuktiBackgroundOrbs({required this.animation});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: _PratyuktiFloatingOrb(
+            animation: animation,
+            start: const Alignment(-1.2, -0.88),
+            end: const Alignment(-0.84, -0.62),
+            size: 220,
+            colors: const [Color(0x334CB7D8), Color(0x2222D3EE)],
+          ),
+        ),
+        Positioned.fill(
+          child: _PratyuktiFloatingOrb(
+            animation: animation,
+            start: const Alignment(1.18, -0.16),
+            end: const Alignment(0.94, 0.08),
+            size: 280,
+            colors: const [Color(0x33F2B95B), Color(0x224CB7D8)],
+            phaseShift: 0.18,
+          ),
+        ),
+        Positioned.fill(
+          child: _PratyuktiFloatingOrb(
+            animation: animation,
+            start: const Alignment(-0.2, 1.3),
+            end: const Alignment(0.18, 1.02),
+            size: 250,
+            colors: const [Color(0x2614B8A6), Color(0x334CB7D8)],
+            phaseShift: 0.34,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PratyuktiFloatingOrb extends StatelessWidget {
+  final Animation<double> animation;
+  final Alignment start;
+  final Alignment end;
+  final double size;
+  final List<Color> colors;
+  final double phaseShift;
+
+  const _PratyuktiFloatingOrb({
+    required this.animation,
+    required this.start,
+    required this.end,
+    required this.size,
+    required this.colors,
+    this.phaseShift = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, _) {
+        final double raw = (animation.value + phaseShift) % 1;
+        final double t = Curves.easeInOut.transform(raw);
+        return Align(
+          alignment: Alignment.lerp(start, end, t)!,
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: colors,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -42,18 +42,28 @@ Future<void> _activateAppCheck() async {
   if (kIsWeb || Firebase.apps.isEmpty) {
     return;
   }
+  const bool forceDebugAppCheck = bool.fromEnvironment(
+    'APP_CHECK_DEBUG',
+    defaultValue: false,
+  );
   try {
     await FirebaseAppCheck.instance.activate(
-      androidProvider: kDebugMode
+      androidProvider: forceDebugAppCheck
           ? AndroidProvider.debug
-          : AndroidProvider.playIntegrity,
-      appleProvider: kDebugMode
+          : kReleaseMode
+          ? AndroidProvider.playIntegrity
+          : AndroidProvider.debug,
+      appleProvider: forceDebugAppCheck
           ? AppleProvider.debug
-          : AppleProvider.deviceCheck,
+          : kReleaseMode
+          ? AppleProvider.deviceCheck
+          : AppleProvider.debug,
     );
 
     if (kDebugMode) {
-      final String? debugToken = await FirebaseAppCheck.instance.getToken(true);
+      // Avoid forced refresh in debug; repeated restarts/hot-restarts can hit
+      // App Check throttling ("Too many attempts").
+      final String? debugToken = await FirebaseAppCheck.instance.getToken();
       if (debugToken != null && debugToken.isNotEmpty) {
         debugPrint('App Check debug token: $debugToken');
       }

@@ -18,6 +18,8 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
   String _selectedFilter = 'Nearby';
   bool _showProtocols = true;
   final bool _isAuthorityUser = false;
+  final Set<String> _upvotedPostIds = <String>{};
+  final Set<String> _reportedPostIds = <String>{};
 
   final List<_CommunityPost> _posts = [
     const _CommunityPost(
@@ -271,7 +273,8 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
   List<_CommunityPost> get _filteredPosts {
     final query = _searchController.text.trim().toLowerCase();
     return _posts.where((post) {
-      final matchesQuery = query.isEmpty ||
+      final matchesQuery =
+          query.isEmpty ||
           post.title.toLowerCase().contains(query) ||
           post.description.toLowerCase().contains(query) ||
           post.location.toLowerCase().contains(query);
@@ -292,8 +295,9 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
   void _openComposer() {
     final titleController = TextEditingController();
     final descController = TextEditingController();
-    final locationController =
-        TextEditingController(text: 'MG Road, Bengaluru');
+    final locationController = TextEditingController(
+      text: 'MG Road, Bengaluru',
+    );
     PostType selectedType = PostType.alert;
     String selectedCategory = 'Road';
     String selectedSeverity = 'Medium';
@@ -374,13 +378,16 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
                             onSelected: (_) {
                               setSheetState(() => selectedType = type);
                             },
-                            selectedColor: AppTheme.primaryNavy.withOpacity(0.12),
+                            selectedColor: AppTheme.primaryNavy.withOpacity(
+                              0.12,
+                            ),
                             labelStyle: TextStyle(
                               color: selected
                                   ? AppTheme.primaryNavy
                                   : AppTheme.textMuted(context),
-                              fontWeight:
-                                  selected ? FontWeight.w600 : FontWeight.w500,
+                              fontWeight: selected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
                             ),
                           );
                         }).toList(),
@@ -389,10 +396,7 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
                       DropdownButtonFormField<String>(
                         value: selectedCategory,
                         items: const [
-                          DropdownMenuItem(
-                            value: 'Road',
-                            child: Text('Road'),
-                          ),
+                          DropdownMenuItem(value: 'Road', child: Text('Road')),
                           DropdownMenuItem(
                             value: 'Lighting',
                             child: Text('Lighting'),
@@ -424,8 +428,9 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
                           filled: true,
                           fillColor: AppTheme.surface(context),
                           border: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppTheme.radius),
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radius,
+                            ),
                             borderSide: BorderSide.none,
                           ),
                         ),
@@ -476,7 +481,9 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
                           filled: true,
                           fillColor: AppTheme.surface(context),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppTheme.radius),
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radius,
+                            ),
                             borderSide: BorderSide.none,
                           ),
                         ),
@@ -508,8 +515,9 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
                           foregroundColor: AppTheme.primaryNavy,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppTheme.radiusSm),
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radiusSm,
+                            ),
                           ),
                         ),
                       ),
@@ -533,8 +541,9 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
                           foregroundColor: AppTheme.primaryNavy,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppTheme.radiusSm),
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radiusSm,
+                            ),
                           ),
                         ),
                       ),
@@ -554,8 +563,9 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
                           foregroundColor: Colors.redAccent,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppTheme.radiusSm),
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radiusSm,
+                            ),
                           ),
                         ),
                       ),
@@ -593,7 +603,10 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.verified, color: AppTheme.primaryNavy),
+                              const Icon(
+                                Icons.verified,
+                                color: AppTheme.primaryNavy,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -626,14 +639,14 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
                           }
 
                           final newPost = _CommunityPost(
-                            id:
-                                'C-${DateTime.now().millisecondsSinceEpoch % 10000}',
+                            id: 'C-${DateTime.now().millisecondsSinceEpoch % 10000}',
                             type: selectedType,
                             authorName: _isAuthorityUser
                                 ? 'City Office'
                                 : 'You',
-                            authorRole:
-                                _isAuthorityUser ? 'Authority' : 'Resident',
+                            authorRole: _isAuthorityUser
+                                ? 'Authority'
+                                : 'Resident',
                             title: title,
                             description: desc,
                             location: location,
@@ -693,25 +706,25 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                      Center(
-                        child: Container(
-                          width: 48,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: AppTheme.border(context),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
+                    Center(
+                      child: Container(
+                        width: 48,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: AppTheme.border(context),
+                          borderRadius: BorderRadius.circular(20),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Comments',
-                        style: GoogleFonts.outfit(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary(context),
-                        ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Comments',
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary(context),
                       ),
+                    ),
                     const SizedBox(height: 8),
                     SizedBox(
                       height: 220,
@@ -735,8 +748,9 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
                               filled: true,
                               fillColor: AppTheme.surface(context),
                               border: OutlineInputBorder(
-                                borderRadius:
-                                    BorderRadius.circular(AppTheme.radius),
+                                borderRadius: BorderRadius.circular(
+                                  AppTheme.radius,
+                                ),
                                 borderSide: BorderSide.none,
                               ),
                             ),
@@ -754,10 +768,7 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
                               timeAgo: 'Just now',
                             );
                             setSheetState(() {
-                              comments.insert(
-                                0,
-                                newComment,
-                              );
+                              comments.insert(0, newComment);
                             });
                             setState(() {
                               final index = _posts.indexWhere(
@@ -791,6 +802,62 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
     );
   }
 
+  void _toggleUpvote(_CommunityPost post) {
+    final int index = _posts.indexWhere((item) => item.id == post.id);
+    if (index == -1) return;
+    final _CommunityPost current = _posts[index];
+    final bool alreadyUpvoted = _upvotedPostIds.contains(post.id);
+
+    setState(() {
+      if (alreadyUpvoted) {
+        _upvotedPostIds.remove(post.id);
+        _posts[index] = current.copyWith(
+          upvotes: current.upvotes > 0 ? current.upvotes - 1 : 0,
+        );
+      } else {
+        _upvotedPostIds.add(post.id);
+        _posts[index] = current.copyWith(upvotes: current.upvotes + 1);
+      }
+    });
+  }
+
+  void _reportPost(_CommunityPost post) {
+    if (_reportedPostIds.contains(post.id)) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Already reported by you.')));
+      return;
+    }
+    setState(() {
+      _reportedPostIds.add(post.id);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Reported. Moderation team has been notified.'),
+      ),
+    );
+  }
+
+  void _handlePostAction(String action, _CommunityPost selectedPost) {
+    if (action == 'Upvote') {
+      _toggleUpvote(selectedPost);
+      return;
+    }
+    if (action == 'Report') {
+      _reportPost(selectedPost);
+      return;
+    }
+    if (action == 'Save') {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Saved for later.')));
+      return;
+    }
+    if (action == 'Comment') {
+      _openCommentsSheet(selectedPost);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -800,115 +867,182 @@ class _CommunityAlertsViewState extends State<CommunityAlertsView> {
         icon: const Icon(Icons.edit_outlined, color: Colors.white),
         label: const Text(
           'Post update',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
         foregroundColor: Colors.white,
         onPressed: _openComposer,
       ),
-      body: SafeArea(
-        child: AnimatedEntrance(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.arrow_back_rounded),
-                      color: AppTheme.primaryNavy,
+      body: Stack(
+        children: [
+          const _ScreenBackdrop(),
+          SafeArea(
+            child: AnimatedEntrance(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                    child: Row(
+                      children: [
+                        _TopIconBubble(
+                          icon: Icons.arrow_back_rounded,
+                          onTap: () => Navigator.pop(context),
+                        ),
+                        const Spacer(),
+                        Hero(
+                          tag: 'vidhigya-wordmark',
+                          child: Image.asset(
+                            'assets/images/vidhigya_wordmark.png',
+                            height: 24,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Community Alerts',
-                      style: GoogleFonts.outfit(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary(context),
-                      ),
-                    ),
-                    const Spacer(),
-                    Hero(
-                      tag: 'vidhigya-wordmark',
-                      child: Image.asset(
-                        'assets/images/vidhigya_wordmark.png',
-                        height: 22,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                child: Text(
-                  'Civic updates from your neighborhood, verified and actionable.',
-                  style: GoogleFonts.manrope(
-                    fontSize: 13,
-                    color: AppTheme.textMuted(context),
                   ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: _ProtocolCard(
-                  expanded: _showProtocols,
-                  onToggle: () {
-                    setState(() {
-                      _showProtocols = !_showProtocols;
-                    });
-                  },
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: _SearchBar(controller: _searchController),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: _FilterRow(
-                  selected: _selectedFilter,
-                  onSelect: (value) {
-                    setState(() {
-                      _selectedFilter = value;
-                    });
-                  },
-                ),
-              ),
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
-                  itemBuilder: (context, index) {
-                    final post = _filteredPosts[index];
-                    return _PostCard(
-                      post: post,
-                      onAction: (action, selectedPost) {
-                        if (action == 'Report') {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Thanks. Report sent for review.'),
-                            ),
-                          );
-                        } else if (action == 'Save') {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Saved for later.')),
-                          );
-                        } else if (action == 'Comment') {
-                          _openCommentsSheet(selectedPost);
-                        }
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Community Alerts',
+                        style: GoogleFonts.outfit(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    child: Text(
+                      'Civic updates from your neighborhood, verified and actionable.',
+                      style: GoogleFonts.manrope(
+                        fontSize: 13,
+                        color: AppTheme.textMuted(context),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: _ProtocolCard(
+                      expanded: _showProtocols,
+                      onToggle: () {
+                        setState(() {
+                          _showProtocols = !_showProtocols;
+                        });
                       },
-                    );
-                  },
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemCount: _filteredPosts.length,
-                ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    child: _SearchBar(controller: _searchController),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: _FilterRow(
+                      selected: _selectedFilter,
+                      onSelect: (value) {
+                        setState(() {
+                          _selectedFilter = value;
+                        });
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
+                      itemBuilder: (context, index) {
+                        final post = _filteredPosts[index];
+                        return _PostCard(
+                          post: post,
+                          isUpvoted: _upvotedPostIds.contains(post.id),
+                          isReported: _reportedPostIds.contains(post.id),
+                          onAction: _handlePostAction,
+                        );
+                      },
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemCount: _filteredPosts.length,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScreenBackdrop extends StatelessWidget {
+  const _ScreenBackdrop();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [AppTheme.cloud, AppTheme.mist],
+              ),
+            ),
           ),
         ),
+        Positioned(
+          left: -86,
+          top: 108,
+          child: Container(
+            width: 250,
+            height: 250,
+            decoration: BoxDecoration(
+              color: AppTheme.tealAccent.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        Positioned(
+          right: -74,
+          bottom: 150,
+          child: Container(
+            width: 230,
+            height: 230,
+            decoration: BoxDecoration(
+              color: AppTheme.purpleAccent.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TopIconBubble extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _TopIconBubble({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: AppTheme.surface(context),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.border(context)),
+          boxShadow: AppTheme.softShadow,
+        ),
+        alignment: Alignment.center,
+        child: Icon(icon, size: 21, color: AppTheme.primaryNavy),
       ),
     );
   }
@@ -944,10 +1078,7 @@ class _ProtocolCard extends StatelessWidget {
   final bool expanded;
   final VoidCallback onToggle;
 
-  const _ProtocolCard({
-    required this.expanded,
-    required this.onToggle,
-  });
+  const _ProtocolCard({required this.expanded, required this.onToggle});
 
   @override
   Widget build(BuildContext context) {
@@ -992,7 +1123,9 @@ class _ProtocolCard extends StatelessWidget {
             _ProtocolLine(text: 'Posts must be location-based.'),
             _ProtocolLine(text: 'Add a category and severity.'),
             _ProtocolLine(text: 'No spam, politics, or unrelated posts.'),
-            _ProtocolLine(text: 'Verified updates are reviewed by authorities.'),
+            _ProtocolLine(
+              text: 'Verified updates are reviewed by authorities.',
+            ),
           ],
         ],
       ),
@@ -1032,10 +1165,7 @@ class _FilterRow extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onSelect;
 
-  const _FilterRow({
-    required this.selected,
-    required this.onSelect,
-  });
+  const _FilterRow({required this.selected, required this.onSelect});
 
   @override
   Widget build(BuildContext context) {
@@ -1069,10 +1199,14 @@ class _FilterRow extends StatelessWidget {
 
 class _PostCard extends StatelessWidget {
   final _CommunityPost post;
+  final bool isUpvoted;
+  final bool isReported;
   final void Function(String, _CommunityPost) onAction;
 
   const _PostCard({
     required this.post,
+    required this.isUpvoted,
+    required this.isReported,
     required this.onAction,
   });
 
@@ -1141,9 +1275,12 @@ class _PostCard extends StatelessWidget {
                 ),
                 PopupMenuButton<String>(
                   onSelected: (value) => onAction(value, post),
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(value: 'Save', child: Text('Save')),
-                    PopupMenuItem(value: 'Report', child: Text('Report')),
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'Save', child: Text('Save')),
+                    PopupMenuItem(
+                      value: 'Report',
+                      child: Text(isReported ? 'Reported' : 'Report'),
+                    ),
                   ],
                   icon: const Icon(Icons.more_vert, size: 18),
                 ),
@@ -1158,6 +1295,7 @@ class _PostCard extends StatelessWidget {
                 _SeverityPill(severity: post.severity),
                 _CategoryPill(category: post.category),
                 if (post.verified) const _VerifiedPill(),
+                if (isReported) const _ReportedPill(),
               ],
             ),
             const SizedBox(height: 10),
@@ -1205,23 +1343,20 @@ class _PostCard extends StatelessWidget {
                   icon: Icons.place_outlined,
                   label: '${post.location} • ${post.distanceKm} km',
                 ),
-                _MetaChip(
-                  icon: Icons.timer_outlined,
-                  label: post.timeAgo,
-                ),
-                _MetaChip(
-                  icon: Icons.local_offer_outlined,
-                  label: post.id,
-                ),
+                _MetaChip(icon: Icons.timer_outlined, label: post.timeAgo),
+                _MetaChip(icon: Icons.local_offer_outlined, label: post.id),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
                 _ActionButton(
-                  icon: Icons.thumb_up_alt_outlined,
+                  icon: isUpvoted
+                      ? Icons.thumb_up_alt_rounded
+                      : Icons.thumb_up_alt_outlined,
                   label: post.upvotes.toString(),
-                  onTap: () {},
+                  highlighted: isUpvoted,
+                  onTap: () => onAction('Upvote', post),
                 ),
                 const SizedBox(width: 8),
                 _ActionButton(
@@ -1231,8 +1366,10 @@ class _PostCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 _ActionButton(
-                  icon: Icons.flag_outlined,
-                  label: 'Report',
+                  icon: isReported ? Icons.flag_rounded : Icons.flag_outlined,
+                  label: isReported ? 'Reported' : 'Report',
+                  highlighted: isReported,
+                  activeColor: const Color(0xFFDC2626),
                   onTap: () => onAction('Report', post),
                 ),
                 const Spacer(),
@@ -1371,6 +1508,36 @@ class _VerifiedPill extends StatelessWidget {
   }
 }
 
+class _ReportedPill extends StatelessWidget {
+  const _ReportedPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFDC2626).withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(Icons.flag_rounded, size: 14, color: Color(0xFFDC2626)),
+          SizedBox(width: 4),
+          Text(
+            'Reported',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFDC2626),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MetaChip extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1406,27 +1573,29 @@ class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
+  final bool highlighted;
+  final Color activeColor;
 
   const _ActionButton({
     required this.icon,
     required this.label,
     this.onTap,
+    this.highlighted = false,
+    this.activeColor = AppTheme.primaryNavy,
   });
 
   @override
   Widget build(BuildContext context) {
+    final Color fgColor = highlighted ? activeColor : AppTheme.primaryNavy;
     return TextButton.icon(
       onPressed: onTap,
-      icon: Icon(icon, size: 18, color: AppTheme.primaryNavy),
+      icon: Icon(icon, size: 18, color: fgColor),
       label: Text(
         label,
-        style: const TextStyle(
-          color: AppTheme.primaryNavy,
-          fontWeight: FontWeight.w600,
-        ),
+        style: TextStyle(color: fgColor, fontWeight: FontWeight.w600),
       ),
       style: TextButton.styleFrom(
-        backgroundColor: AppTheme.primaryNavy.withOpacity(0.08),
+        backgroundColor: fgColor.withOpacity(0.1),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
@@ -1556,6 +1725,7 @@ class _CommunityPost {
   });
 
   _CommunityPost copyWith({
+    int? upvotes,
     int? comments,
     List<_Comment>? commentsData,
   }) {
@@ -1574,7 +1744,7 @@ class _CommunityPost {
       verified: verified,
       imageUrl: imageUrl,
       imageBytes: imageBytes,
-      upvotes: upvotes,
+      upvotes: upvotes ?? this.upvotes,
       comments: comments ?? this.comments,
       commentsData: commentsData ?? this.commentsData,
     );

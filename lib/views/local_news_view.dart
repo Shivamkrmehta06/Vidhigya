@@ -659,121 +659,216 @@ class _LocalNewsViewState extends State<LocalNewsView> {
     final int displayIndex = hasStories ? _currentIndex + 1 : 0;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Row(
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [AppTheme.cloud, AppTheme.mist],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: -86,
+            top: 108,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                color: AppTheme.tealAccent.withValues(alpha: 0.14),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Positioned(
+            right: -74,
+            bottom: 150,
+            child: Container(
+              width: 230,
+              height: 230,
+              decoration: BoxDecoration(
+                color: AppTheme.purpleAccent.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    color: AppTheme.primaryNavy,
+                  Row(
+                    children: [
+                      _NewsIconBubble(
+                        icon: Icons.arrow_back_rounded,
+                        onTap: () => Navigator.pop(context),
+                      ),
+                      const Spacer(),
+                      Hero(
+                        tag: 'vidhigya-wordmark',
+                        child: Image.asset(
+                          'assets/images/vidhigya_wordmark.png',
+                          height: 24,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      _NewsIconBubble(
+                        icon: Icons.refresh_rounded,
+                        onTap: _isLoading ? null : _loadLiveStories,
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(height: 14),
                   Text(
                     'Local News',
                     style: GoogleFonts.outfit(
-                      fontSize: 20,
+                      fontSize: 30,
                       fontWeight: FontWeight.w700,
                       color: textPrimary,
                     ),
                   ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: _isLoading ? null : _loadLiveStories,
-                    icon: const Icon(Icons.refresh_rounded),
-                    color: AppTheme.primaryNavy,
-                    tooltip: 'Refresh',
-                  ),
-                  Hero(
-                    tag: 'vidhigya-wordmark',
-                    child: Image.asset(
-                      'assets/images/vidhigya_wordmark.png',
-                      height: 22,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
-              child: Row(
-                children: [
+                  const SizedBox(height: 4),
                   Text(
-                    hasStories
-                        ? 'Story $displayIndex of ${_stories.length}'
-                        : 'No stories available',
-                    style: GoogleFonts.manrope(fontSize: 12, color: textMuted),
+                    'Live civic updates from verified publishers.',
+                    style: GoogleFonts.manrope(fontSize: 13, color: textMuted),
                   ),
-                  const Spacer(),
-                  _StoryDots(count: _stories.length, index: _currentIndex),
-                ],
-              ),
-            ),
-            if (_statusMessage != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Row(
-                  children: [
-                    Icon(
-                      _usingFallback
-                          ? Icons.info_outline
-                          : Icons.public_rounded,
-                      size: 14,
-                      color: textMuted,
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        _statusMessage!,
-                        style: GoogleFonts.manrope(
-                          fontSize: 11,
-                          color: textMuted,
-                        ),
-                      ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface(context),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                      border: Border.all(color: AppTheme.border(context)),
+                      boxShadow: AppTheme.softShadow,
                     ),
-                  ],
-                ),
-              ),
-            Expanded(
-              child: hasStories
-                  ? PageView.builder(
-                      scrollDirection: Axis.vertical,
-                      physics: const PageScrollPhysics(),
-                      itemCount: _stories.length,
-                      controller: _controller,
-                      onPageChanged: (value) {
-                        setState(() => _currentIndex = value);
-                      },
-                      itemBuilder: (context, index) {
-                        final story = _stories[index];
-                        return _NewsStoryPage(story: story);
-                      },
-                    )
-                  : Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (_isLoading) const CircularProgressIndicator(),
-                          if (_isLoading) const SizedBox(height: 12),
-                          Text(
-                            _isLoading
-                                ? 'Loading live local stories...'
-                                : 'Could not load news. Pull to refresh.',
+                    child: Row(
+                      children: [
+                        Icon(Icons.feed_outlined, size: 16, color: textMuted),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            hasStories
+                                ? 'Story $displayIndex of ${_stories.length}'
+                                : 'No stories available',
                             style: GoogleFonts.manrope(
-                              fontSize: 13,
+                              fontSize: 12,
                               color: textMuted,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (hasStories)
+                          _StoryDots(
+                            count: _stories.length,
+                            index: _currentIndex,
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (_statusMessage != null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface(context),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusXs),
+                        border: Border.all(color: AppTheme.border(context)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _usingFallback
+                                ? Icons.info_outline_rounded
+                                : Icons.public_rounded,
+                            size: 14,
+                            color: textMuted,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              _statusMessage!,
+                              style: GoogleFonts.manrope(
+                                fontSize: 11,
+                                color: textMuted,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
+                  ],
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: hasStories
+                        ? PageView.builder(
+                            scrollDirection: Axis.vertical,
+                            physics: const PageScrollPhysics(),
+                            itemCount: _stories.length,
+                            controller: _controller,
+                            onPageChanged: (value) {
+                              setState(() => _currentIndex = value);
+                            },
+                            itemBuilder: (context, index) {
+                              final story = _stories[index];
+                              return _NewsStoryPage(story: story);
+                            },
+                          )
+                        : Center(
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 20,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surface(context),
+                                borderRadius: BorderRadius.circular(
+                                  AppTheme.radius,
+                                ),
+                                border: Border.all(
+                                  color: AppTheme.border(context),
+                                ),
+                                boxShadow: AppTheme.softShadow,
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_isLoading)
+                                    const CircularProgressIndicator(),
+                                  if (_isLoading) const SizedBox(height: 12),
+                                  Text(
+                                    _isLoading
+                                        ? 'Loading live local stories...'
+                                        : 'Could not load news. Pull to refresh.',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 13,
+                                      color: textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -790,155 +885,211 @@ class _NewsStoryPage extends StatelessWidget {
     final textMuted = AppTheme.textMuted(context);
     final bool showPublisherLogo = story.isPublisherImage;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppTheme.radius),
-            child: story.imageUrl == null && story.fallbackImageUrl == null
-                ? Container(
-                    height: 220,
-                    width: double.infinity,
-                    color: AppTheme.surface(context),
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.newspaper_rounded, size: 36),
-                  )
-                : Image.network(
-                    story.imageUrl ?? story.fallbackImageUrl!,
-                    height: 220,
-                    width: double.infinity,
-                    fit: showPublisherLogo ? BoxFit.contain : BoxFit.cover,
-                    alignment: Alignment.center,
-                    headers: const <String, String>{
-                      'User-Agent':
-                          'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 '
-                          '(KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      if (story.imageUrl != null &&
-                          story.fallbackImageUrl != null) {
-                        return Image.network(
-                          story.fallbackImageUrl!,
-                          height: 220,
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 14),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface(context),
+          borderRadius: BorderRadius.circular(AppTheme.radius),
+          border: Border.all(color: AppTheme.border(context)),
+          boxShadow: AppTheme.cardShadow,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(AppTheme.radius),
+              ),
+              child: story.imageUrl == null && story.fallbackImageUrl == null
+                  ? Container(
+                      height: 210,
+                      width: double.infinity,
+                      color: AppTheme.cloud,
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.newspaper_rounded, size: 36),
+                    )
+                  : Image.network(
+                      story.imageUrl ?? story.fallbackImageUrl!,
+                      height: 210,
+                      width: double.infinity,
+                      fit: showPublisherLogo ? BoxFit.contain : BoxFit.cover,
+                      alignment: Alignment.center,
+                      headers: const <String, String>{
+                        'User-Agent':
+                            'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 '
+                            '(KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        if (story.imageUrl != null &&
+                            story.fallbackImageUrl != null) {
+                          return Image.network(
+                            story.fallbackImageUrl!,
+                            height: 210,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder:
+                                (context, fallbackError, fallbackStackTrace) {
+                                  return Container(
+                                    height: 210,
+                                    width: double.infinity,
+                                    color: AppTheme.cloud,
+                                    alignment: Alignment.center,
+                                    child: const Icon(
+                                      Icons.newspaper_rounded,
+                                      size: 36,
+                                    ),
+                                  );
+                                },
+                          );
+                        }
+                        return Container(
+                          height: 210,
                           width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder:
-                              (context, fallbackError, fallbackStackTrace) {
-                                return Container(
-                                  height: 220,
-                                  width: double.infinity,
-                                  color: AppTheme.surface(context),
-                                  alignment: Alignment.center,
-                                  child: const Icon(
-                                    Icons.newspaper_rounded,
-                                    size: 36,
+                          color: AppTheme.cloud,
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.newspaper_rounded, size: 36),
+                        );
+                      },
+                    ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      story.title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 21,
+                        fontWeight: FontWeight.w700,
+                        color: textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            story.source,
+                            style: GoogleFonts.manrope(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: textMuted,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          story.time,
+                          style: GoogleFonts.manrope(
+                            fontSize: 12,
+                            color: textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    for (final String paragraph in story.body)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          paragraph,
+                          style: GoogleFonts.manrope(
+                            fontSize: 14,
+                            height: 1.5,
+                            color: textPrimary,
+                          ),
+                        ),
+                      ),
+                    if (story.linkUrl != null)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () async {
+                            final String raw = story.linkUrl!.trim();
+                            final Uri? url = Uri.tryParse(raw);
+                            if (url == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Invalid article link'),
+                                ),
+                              );
+                              return;
+                            }
+                            try {
+                              final bool opened = await launchUrl(
+                                url,
+                                mode: LaunchMode.externalApplication,
+                              );
+                              if (!opened && context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Could not open article'),
                                   ),
                                 );
-                              },
-                        );
-                      }
-                      return Container(
-                        height: 220,
-                        width: double.infinity,
-                        color: AppTheme.surface(context),
-                        alignment: Alignment.center,
-                        child: const Icon(Icons.newspaper_rounded, size: 36),
-                      );
-                    },
-                  ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            story.title,
-            style: GoogleFonts.outfit(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: textPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Text(
-                story.source,
-                style: GoogleFonts.manrope(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: textMuted,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                story.time,
-                style: GoogleFonts.manrope(fontSize: 12, color: textMuted),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: ListView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: story.body.length,
-              itemBuilder: (context, index) {
-                final paragraph = story.body[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    paragraph,
-                    style: GoogleFonts.manrope(
-                      fontSize: 14,
-                      height: 1.5,
-                      color: textPrimary,
+                              }
+                            } catch (_) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Could not open article'),
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                          label: const Text('Read full article'),
+                        ),
+                      ),
+                    const SizedBox(height: 2),
+                    Center(
+                      child: Text(
+                        'Swipe up or down for stories',
+                        style: GoogleFonts.manrope(
+                          fontSize: 12,
+                          color: textMuted,
+                        ),
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
-          ),
-          if (story.linkUrl != null) ...[
-            const SizedBox(height: 4),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () async {
-                  final String raw = story.linkUrl!.trim();
-                  final Uri? url = Uri.tryParse(raw);
-                  if (url == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Invalid article link')),
-                    );
-                    return;
-                  }
-                  try {
-                    final bool opened = await launchUrl(
-                      url,
-                      mode: LaunchMode.externalApplication,
-                    );
-                    if (!opened && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Could not open article')),
-                      );
-                    }
-                  } catch (_) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Could not open article')),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                label: const Text('Read full article'),
+                  ],
+                ),
               ),
             ),
           ],
-          Center(
-            child: Text(
-              'Swipe up or down for stories',
-              style: GoogleFonts.manrope(fontSize: 12, color: textMuted),
-            ),
-          ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NewsIconBubble extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  const _NewsIconBubble({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: AppTheme.surface(context),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.border(context)),
+          boxShadow: AppTheme.softShadow,
+        ),
+        alignment: Alignment.center,
+        child: Icon(
+          icon,
+          size: 21,
+          color: onTap == null
+              ? AppTheme.textMuted(context)
+              : AppTheme.primaryNavy,
+        ),
       ),
     );
   }
